@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soroban AR</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#16123a;font-family:'Arial Rounded MT Bold','Trebuchet MS','Segoe UI',sans-serif}
+#startScreen{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#12c2c9 0%,#4f6bed 52%,#a855f7 100%);display:flex;flex-direction:column;align-items:center;gap:18px;color:#fff;text-align:center;padding:20px;overflow:auto}
+#startMascot{width:clamp(96px,16vh,150px);margin-top:auto;flex:none}
+.start-note{margin-bottom:auto}
+#startScreen h1{font-size:clamp(2.2rem,6vw,3.4rem);letter-spacing:.5px;text-shadow:0 4px 0 rgba(40,20,110,.35)}
+.start-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:min(760px,100%)}
+.start-card{background:rgba(255,255,255,.92);color:#2b2350;border-radius:20px;padding:14px;line-height:1.3;font-size:.95rem;display:flex;flex-direction:column;gap:4px;box-shadow:0 6px 0 rgba(40,20,110,.25)}
+.start-card b{color:#5b3fd6;font-size:1.1rem}
+.start-note{font-size:.85rem;opacity:.9;max-width:560px;line-height:1.4}
+#startBtn{padding:16px 52px;font:inherit;font-size:1.35rem;border:0;border-radius:999px;background:#ffc300;color:#3a2600;cursor:pointer;box-shadow:0 7px 0 #d98e00;transition:transform .12s,box-shadow .12s}
+#startBtn:hover{transform:translateY(-2px);box-shadow:0 9px 0 #d98e00}
+#startBtn:active{transform:translateY(5px);box-shadow:0 2px 0 #d98e00}
+#startBtn:disabled{opacity:.6;cursor:wait;transform:none}
+@media(max-width:640px){.start-cards{grid-template-columns:1fr}}
+#video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);z-index:1}
+#overlay{position:fixed;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
+#sorobanWrap{position:fixed;bottom:14%;left:5%;z-index:3;pointer-events:none;transform-origin:left bottom}
+#frame{display:inline-block;padding:14px;background:linear-gradient(150deg,#14c8c2 0%,#3f8cff 52%,#9b5cf6 100%);border-radius:28px;box-shadow:0 10px 0 rgba(40,20,110,.4),0 18px 34px rgba(0,0,0,.35),inset 0 3px 0 rgba(255,255,255,.55),inset 0 -4px 0 rgba(30,10,90,.3)}
+#board{position:relative;background:rgba(255,255,255,.35);border-radius:16px;box-shadow:inset 0 3px 10px rgba(30,10,90,.3);overflow:hidden}
+.col{position:absolute;top:0;height:100%;transition:background .3s}
+.col.active{background:rgba(255,225,80,.38)}
+.col.flash{animation:colflash .4s ease}
+@keyframes colflash{0%,100%{background:rgba(138,201,38,.35)}50%{background:rgba(138,201,38,.6)}}
+.rod{position:absolute;top:0;bottom:0;left:50%;width:6px;margin-left:-3px;background:rgba(255,255,255,.8);box-shadow:0 0 3px rgba(30,10,90,.45);border-radius:4px;z-index:1}
+.beam{position:absolute;left:0;right:0;background:linear-gradient(180deg,#ff8a5c 0%,#e8476a 100%);box-shadow:0 2px 4px rgba(30,10,90,.4),inset 0 2px 0 rgba(255,255,255,.4);z-index:2}
+.dot{position:absolute;left:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(120,20,60,.35);z-index:3}
+.bead{position:absolute;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);opacity:.92;z-index:4;transition:top .18s ease-out;touch-action:manipulation;user-select:none}
+.bead::after{content:'';position:absolute;left:22%;top:18%;width:30%;height:22%;border-radius:50%;background:rgba(255,255,255,.7);transform:rotate(-20deg)}
+.bead.touched{opacity:1;z-index:5;filter:brightness(1.35) saturate(1.5);animation:beadbuzz .13s linear infinite}
+.bead.touched::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,255,255,.85) 0%,rgba(255,255,255,.3) 45%,rgba(255,255,255,0) 72%)}
+@keyframes beadbuzz{0%,100%{transform:translate(0,0) scale(1.14)}25%{transform:translate(-1.5px,.5px) scale(1.14)}50%{transform:translate(1.5px,-.5px) scale(1.14)}75%{transform:translate(-1px,-.5px) scale(1.14)}}
+@media(prefers-reduced-motion:reduce){.bead.touched{animation:none;transform:scale(1.14)}}
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px}
+.hud-box{background:rgba(255,255,255,.93);color:#2b2350;padding:8px 18px;border-radius:999px;font-size:1rem;box-shadow:0 4px 0 rgba(40,20,110,.3)}
+#gestureLabel{font-size:1.1rem;min-width:200px;max-width:52vw;text-align:center;transition:background .2s}
+#gestureLabel.ok{background:#22c55e;color:#fff;animation:labelpop .35s ease}
+#gestureLabel.hold{background:#ffb020;color:#3a2600}
+@keyframes labelpop{0%{transform:scale(.9)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+#valueDisplay{font-size:1.6rem;font-variant-numeric:tabular-nums;min-width:150px;text-align:center;color:#5b3fd6}
+#holdBar{position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:10;width:220px;height:9px;background:rgba(255,255,255,.5);border-radius:6px;overflow:hidden;display:none}
+#holdFill{height:100%;width:0;background:linear-gradient(90deg,#ffb020,#22c55e);border-radius:6px;transition:width .1s linear}
+#guide{position:fixed;bottom:0;left:0;right:0;z-index:10;pointer-events:none;display:flex;justify-content:center;gap:8px;padding:8px;flex-wrap:wrap}
+.guide-item{background:rgba(255,255,255,.88);color:#2b2350;padding:4px 12px;border-radius:999px;font-size:.78rem}
+.guide-item b{color:#5b3fd6}
+#colIndicator{position:fixed;z-index:4;pointer-events:none;border:3px solid rgba(255,225,80,.9);border-radius:12px;background:rgba(255,225,80,.08);transition:left .1s,top .1s,width .1s,height .1s,border-color .3s,background .3s;display:none}
+#error{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;color:#fff;text-align:center;padding:20px;font-size:1.2rem;flex-direction:column;gap:12px}
+#error button{padding:10px 30px;border:0;border-radius:999px;background:#ffc300;color:#3a2600;font:inherit;cursor:pointer}
+#diag{position:fixed;top:64px;right:12px;z-index:20;width:330px;max-height:calc(100% - 110px);overflow:auto;display:none;background:rgba(30,22,70,.92);color:#eee;padding:10px 12px;border-radius:16px;font-size:.78rem}
+#diag b{color:#FFC300}
+#diagText{white-space:pre-wrap;font-family:Consolas,monospace;font-size:.74rem;line-height:1.4;margin:6px 0 8px}
+#diagSliders label{display:grid;grid-template-columns:1fr 44px;gap:0 8px;margin-bottom:6px}
+#diagSliders input{grid-column:1/3;width:100%}
+#diagSliders span:nth-child(2){text-align:right;color:#FFC300}
+#diagHelp{min-height:5.2em;margin-bottom:8px;padding:6px 8px;border-radius:8px;background:rgba(255,195,0,.14);line-height:1.35}
+#diagReset{width:100%;padding:6px;border:0;border-radius:8px;background:#444;color:#fff;cursor:pointer}
+#noHandMsg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6;color:#fff;background:rgba(40,20,110,.55);padding:8px 20px;border-radius:999px;font-size:1.15rem;pointer-events:none;text-align:center;display:none}
+#mascot{position:fixed;right:3%;bottom:14%;width:clamp(76px,11vw,136px);z-index:6;pointer-events:none}
+#mascotBubble{position:absolute;right:20%;bottom:100%;margin-bottom:8px;width:max-content;max-width:190px;background:#fff;color:#2b2350;padding:7px 13px;border-radius:16px;font-size:.92rem;line-height:1.2;box-shadow:0 4px 0 rgba(40,20,110,.3);opacity:0;transform:translateY(6px) scale(.9);transition:opacity .18s,transform .18s}
+#mascot.talk #mascotBubble{opacity:1;transform:none}
+.mascot-art{display:block;width:100%;overflow:visible}
+.m-body{transform-origin:60px 110px;animation:mbob 3s ease-in-out infinite}
+.m-eyes{transform-origin:60px 62px;animation:mblink 4.5s infinite}
+.m-closed,.m-smile,.m-focus{display:none}
+#mascot.focus .m-body{animation:none;transform:rotate(-4deg)}
+#mascot.focus .m-mouth{display:none}
+#mascot.focus .m-focus{display:block}
+#mascot.happy .m-body{animation:mjump .55s ease 2}
+#mascot.happy .m-eyes,#mascot.sleep .m-eyes,#mascot.happy .m-mouth,#mascot.sleep .m-mouth{display:none}
+#mascot.happy .m-closed,#mascot.sleep .m-closed,#mascot.happy .m-smile{display:block}
+#mascot.hint .m-body{animation:none;transform:rotate(7deg)}
+#mascot.sleep .m-body{animation:mbob 5s ease-in-out infinite}
+@keyframes mbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes mblink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+@keyframes mjump{0%,100%{transform:translateY(0) scale(1)}45%{transform:translateY(-20px) scale(1.05)}}
+@media(prefers-reduced-motion:reduce){.m-body,.m-eyes,#mascot.happy .m-body,#mascot.sleep .m-body{animation:none}}
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+  <div id="startMascot"></div>
+  <h1>Soroban AR</h1>
+  <div class="start-cards">
+    <div class="start-card"><b>Pulgar</b><span>Sube cuentas inferiores para sumar.</span></div>
+    <div class="start-card"><b>Índice</b><span>Baja cuentas inferiores para restar y mueve la cuenta superior.</span></div>
+    <div class="start-card"><b>Desde la punta</b><span>Detén el dedo en la mitad de la cuenta y empuja.</span></div>
+  </div>
+  <button id="startBtn">Activar cámara</button>
+  <p class="start-note">Requiere Chrome o Edge y permiso de cámara. Tecla D: diagnóstico. Tecla M: mostrar u ocultar la mascota.</p>
+</div>
+
+<div id="error">
+  <p id="errorMsg"></p>
+  <button onclick="location.reload()">Reintentar</button>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="overlay"></canvas>
+<div id="colIndicator"></div>
+
+<div id="sorobanWrap">
+  <div id="frame">
+    <div id="board"></div>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="hud-box" id="valueDisplay">Valor: 0</div>
+  <div class="hud-box" id="gestureLabel">Esperando mano...</div>
+  <div class="hud-box" id="colDisplay">Col: -</div>
+</div>
+
+<div id="holdBar"><div id="holdFill"></div></div>
+
+<div id="guide">
+  <div class="guide-item"><b>Pulgar</b> sube y suma</div>
+  <div class="guide-item"><b>Índice</b> baja y resta</div>
+  <div class="guide-item">Detén el dedo y empuja <b>desde la punta</b></div>
+  <div class="guide-item"><b>Dedos juntos</b> por la barra = 0</div>
+</div>
+
+<div id="diag">
+  <b>Diagnóstico (tecla D)</b>
+  <pre id="diagText"></pre>
+  <div id="diagSliders"></div>
+  <div id="diagHelp">Señala una variable para ver qué significa.</div>
+  <button id="diagReset">Valores por defecto</button>
+</div>
+
+<div id="mascot">
+  <div id="mascotBubble"></div>
+  <svg id="mascotArt" class="mascot-art" viewBox="0 0 120 120" aria-hidden="true">
+    <g class="m-body">
+      <circle cx="28" cy="32" r="17" fill="#6b7280"/><circle cx="28" cy="32" r="9" fill="#f3b8c4"/>
+      <circle cx="92" cy="32" r="17" fill="#6b7280"/><circle cx="92" cy="32" r="9" fill="#f3b8c4"/>
+      <ellipse cx="60" cy="66" rx="48" ry="44" fill="#9aa3b2"/>
+      <ellipse cx="60" cy="40" rx="24" ry="14" fill="#eef0f4"/>
+      <path d="M13 62C22 46 46 46 57 63C47 78 24 80 13 62Z" fill="#2f3342"/>
+      <path d="M107 62C98 46 74 46 63 63C73 78 96 80 107 62Z" fill="#2f3342"/>
+      <ellipse cx="60" cy="90" rx="29" ry="20" fill="#f4f5f7"/>
+      <g class="m-eyes">
+        <circle cx="37" cy="62" r="9" fill="#fff"/><circle cx="83" cy="62" r="9" fill="#fff"/>
+        <circle cx="39" cy="63" r="4.5" fill="#1f2230"/><circle cx="81" cy="63" r="4.5" fill="#1f2230"/>
+      </g>
+      <g class="m-closed" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round">
+        <path d="M29 64Q37 56 45 64"/><path d="M75 64Q83 56 91 64"/>
+      </g>
+      <ellipse cx="60" cy="79" rx="7" ry="5" fill="#2f3342"/>
+      <path class="m-mouth" d="M49 91Q60 99 71 91" fill="none" stroke="#2f3342" stroke-width="3.5" stroke-linecap="round"/>
+      <path class="m-focus" d="M52 94H68" fill="none" stroke="#2f3342" stroke-width="3.5" stroke-linecap="round"/>
+      <path class="m-smile" d="M44 88Q60 112 76 88Z" fill="#e8476a" stroke="#2f3342" stroke-width="3" stroke-linejoin="round"/>
+    </g>
+  </svg>
+</div>
+
+<div id="noHandMsg">Muestra tu mano a la cámara</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script>
+const COLS=10,COL_W=80,SLOT=42,BEAD_W=66,BEAD_H=38,GAP=22,TRAVEL=SLOT+GAP;
+const HEAVEN_H=SLOT+TRAVEL,BEAM_H=20,EARTH_H=SLOT*4+TRAVEL,INNER_H=HEAVEN_H+BEAM_H+EARTH_H;
+const FRAME_PAD=14;
+const HUD_SPACE=72;
+const BEAD_LEFT=(COL_W-BEAD_W)/2,BEAD_PAD=(SLOT-BEAD_H)/2;
+const HEAVEN_COLOR='#FFC300';
+const EARTH_COLORS=['#E63946','#F77F00','#FCBF49','#8AC926','#2A9D8F','#219EBC','#6A4C93','#FF70A6','#FF9770','#70D6FF'];
+const ACTION_COOLDOWN=500;
+const PINCH_WINDOW=200;
+const SWEEP_ARM=250;
+const PATH_STEP=4;
+const BEAM_BAND=25;
+const HAND_GRACE=250;
+const OK_LABEL_MS=900;
+const TICK_MS=33;
+const MASCOT_LOCK=1300;
+const MASCOT_TALK_GAP=4000;
+const SLEEP_AFTER=8000;
+const HINT_AFTER=3;
+const OFF_TIP_HINT=3000;
+const CHEERS=['¡Bien!','¡Eso!','¡Exacto!','¡Muy bien!'];
+const HINTS={'recorrido corto':'Empuja un poco más','movimiento poco definido':'Más recto','muy lento':'Un poco más rápido','dirección incorrecta':'Empuja desde la punta','el pulgar solo baja junto con el índice':'El pulgar baja junto con el índice','empate':'Mueve un dedo más que el otro'};
+const TUNE_KEY='sorobanAR.tune';
+const TUNE_DEFAULTS={hold:260,travel:34,tolerance:16,margin:7,straight:.45,dominance:1.5,speed:100};
+const TUNE_FIELDS=[
+  ['hold','Espera (ms)',150,900,10,'Cuánto tiempo debes dejar el dedo quieto sobre la cuenta antes de empujarla. Con menos responde más rápido, pero es más fácil moverla sin querer.'],
+  ['travel','Recorrido (px)',10,60,1,'Cuánto debes mover el dedo para que la cuenta se mueva. Con más necesitas empujes más largos y hay menos movimientos accidentales.'],
+  ['tolerance','Tolerancia (px)',6,40,1,'Cuánto puede temblar el dedo mientras esperas sin que la espera vuelva a empezar. Con más perdona mejor el temblor.'],
+  ['margin','Margen de zona (px)',0,20,1,'Cuánto se agranda la zona de cada cuenta donde el dedo cuenta como tocándola. Con más es más fácil acertar, pero es menos preciso.'],
+  ['straight','Rectitud mínima',.3,1,.05,'Qué tan recto debe ser el empuje. En 1 debe ser totalmente recto; con menos acepta movimientos más torcidos.'],
+  ['dominance','Dominancia',1,3,.1,'Si dos dedos se mueven a la vez, cuántas veces más debe moverse uno que el otro para ganar. Si ninguno lo logra, no se mueve nada.'],
+  ['speed','Velocidad mínima (px/s)',0,600,10,'Qué tan rápido debes empujar para que cuente como una indicación. Con más ignora los movimientos lentos o sin intención; en 0 no exige velocidad.']
+];
+const HELP_IDLE='Señala una variable para ver qué significa.';
+const TUNE=Object.assign({},TUNE_DEFAULTS,loadTune());
+
+const state=Array.from({length:COLS},()=>({heaven:0,earth:0}));
+const cols=[];
+const board=document.getElementById('board');
+const canvas=document.getElementById('overlay');
+const ctx=canvas.getContext('2d');
+const video=document.getElementById('video');
+const gestureLabel=document.getElementById('gestureLabel');
+const valueDisplay=document.getElementById('valueDisplay');
+const colDisplay=document.getElementById('colDisplay');
+const colIndicator=document.getElementById('colIndicator');
+const noHandMsg=document.getElementById('noHandMsg');
+const sorobanWrap=document.getElementById('sorobanWrap');
+const holdBar=document.getElementById('holdBar');
+const holdFill=document.getElementById('holdFill');
+
+let activeCol=null,lastHandAt=0;
+let landmarkHistory=[];
+let boardBox=null,beamScreenY=0,sorobanLeft=0,sorobanRight=0,sorobanTop=0,sorobanBottom=0;
+let colLastAction={};
+let slots={thumb:null,index:null};
+let touchedEls=[],indicatorKey='',okUntil=0;
+let sweep=null,pinchStart=0;
+let diagOn=false,diagDecision='-',diagFps=0,fpsFrames=0,fpsStart=0;
+const diagInputs={};
+const mascot=document.getElementById('mascot');
+const mascotBubble=document.getElementById('mascotBubble');
+let mascotKey='',mascotLock=0,mascotTalkAt=0;
+let pendingReason='',rejectCount=0,offTipSince=0;
+
+const FINGER_NAME={thumb:'Pulgar',index:'Índice'};
+const HAND_CONNECTIONS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+function loadTune(){try{return JSON.parse(localStorage.getItem(TUNE_KEY))||{}}catch(e){return{}}}
+function saveTune(){try{localStorage.setItem(TUNE_KEY,JSON.stringify(TUNE))}catch(e){}}
+
+function beadStyle(c){return'linear-gradient(135deg,color-mix(in srgb,'+c+' 45%,white) 0%,'+c+' 50%,color-mix(in srgb,'+c+' 78%,black) 100%)'}
+function makeBead(c){const b=document.createElement('div');b.className='bead';b.style.left=BEAD_LEFT+'px';b.style.width=BEAD_W+'px';b.style.height=BEAD_H+'px';b.style.background=beadStyle(c);return b}
+
+function buildSoroban(){
+  board.style.width=COLS*COL_W+'px';board.style.height=INNER_H+'px';
+  const beam=document.createElement('div');beam.className='beam';beam.id='beam';
+  beam.style.top=HEAVEN_H+'px';beam.style.height=BEAM_H+'px';board.appendChild(beam);
+  for(let c=0;c<COLS;c++){
+    const col=document.createElement('div');col.className='col';
+    col.style.left=c*COL_W+'px';col.style.width=COL_W+'px';
+    const rod=document.createElement('div');rod.className='rod';col.appendChild(rod);
+    if((COLS-1-c)%3===0){const d=document.createElement('div');d.className='dot';d.style.top=(HEAVEN_H+BEAM_H/2)+'px';col.appendChild(d)}
+    const hv=makeBead(HEAVEN_COLOR);hv.classList.add('hv');col.appendChild(hv);
+    const earth=[];
+    for(let i=0;i<4;i++){const b=makeBead(EARTH_COLORS[c]);col.appendChild(b);earth.push(b)}
+    board.appendChild(col);cols.push({el:col,heaven:hv,earth});renderCol(c);
+  }
+  scaleSoroban();
+}
+
+function renderCol(c){
+  const s=state[c],k=cols[c];
+  k.heaven.style.top=((s.heaven?TRAVEL:0)+BEAD_PAD)+'px';
+  k.earth.forEach((b,i)=>{const off=i<s.earth?0:TRAVEL;b.style.top=(HEAVEN_H+BEAM_H+off+i*SLOT+BEAD_PAD)+'px'});
+}
+
+function getValue(){let v=0;for(let c=0;c<COLS;c++)v=v*10+state[c].heaven*5+state[c].earth;return v}
+function refreshValue(){valueDisplay.textContent='Valor: '+getValue()}
+
+function setActiveCol(p){
+  if(activeCol===p)return;
+  cols.forEach((k,c)=>{k.el.classList.remove('active');if(p!==null&&c===p)k.el.classList.add('active')});
+  activeCol=p;
+  const text='Col: '+(p===null?'-':COLS-p);
+  if(colDisplay.textContent!==text)colDisplay.textContent=text;
+}
+
+function flashCol(col){
+  cols[col].el.classList.add('flash');
+  setTimeout(()=>cols[col].el.classList.remove('flash'),400);
+}
+
+function scaleSoroban(){
+  const maxW=window.innerWidth*.68,maxH=window.innerHeight*.86-HUD_SPACE;
+  const scale=Math.min(1.3,maxW/(COLS*COL_W),maxH/(INNER_H+FRAME_PAD*2));
+  sorobanWrap.style.transform='scale('+scale+')';
+  updateSorobanBounds();
+}
+
+// La posicion del tablero solo cambia con el tamano de ventana: se mide aqui y no en cada cuadro.
+function updateSorobanBounds(){
+  const bRect=board.getBoundingClientRect();
+  const beamEl=document.getElementById('beam');
+  if(!beamEl)return;
+  const beamRect=beamEl.getBoundingClientRect();
+  beamScreenY=beamRect.top+beamRect.height/2;
+  sorobanLeft=bRect.left;sorobanRight=bRect.right;
+  sorobanTop=bRect.top;sorobanBottom=bRect.bottom;
+  boardBox={x:bRect.width/(COLS*COL_W),y:bRect.height/INNER_H,rect:bRect};
+}
+
+function getBoardScale(){return boardBox}
+
+function getBeadScreenRect(colIdx,type,idx){
+  const bs=getBoardScale();
+  const br=bs.rect;
+  const sx=bs.x,sy=bs.y;
+  const cx=br.left+(colIdx*COL_W+BEAD_LEFT)*sx;
+  const w=BEAD_W*sx,h=BEAD_H*sy;
+  if(type==='heaven'){
+    const s=state[colIdx];
+    const y=br.top+((s.heaven?TRAVEL:0)+BEAD_PAD)*sy;
+    return{x:cx,y,w,h,cy:y+h/2};
+  }else{
+    const s=state[colIdx];
+    const off=idx<s.earth?0:TRAVEL;
+    const y=br.top+(HEAVEN_H+BEAM_H+off+idx*SLOT+BEAD_PAD)*sy;
+    return{x:cx,y,w,h,cy:y+h/2};
+  }
+}
+
+// Sentido en que este dedo puede empujar esta cuenta: -1 sube, +1 baja, 0 no puede.
+function pushDir(finger,col,type,idx){
+  const s=state[col];
+  if(type==='heaven')return finger==='index'?(s.heaven?-1:1):0;
+  if(finger==='index')return idx<s.earth?1:0;
+  if(idx>=s.earth)return-1;
+  // El pulgar solo baja cuentas inferiores acompanando al indice en la cuenta superior.
+  const i=slots.index;
+  return i&&i.col===col&&i.type==='heaven'?1:0;
+}
+
+// Mitad de la cuenta del lado de la punta desde la que se empuja, centrada en la varilla.
+function beadTipZone(rect,dir,bs){
+  const m=TUNE.margin*bs.y,cx=rect.x+rect.w/2,hw=rect.w/4+m;
+  return{x0:cx-hw,x1:cx+hw,y0:dir<0?rect.cy-m:rect.y-m,y1:dir<0?rect.y+rect.h+m:rect.cy+m};
+}
+
+function findPushableBead(finger,pos,col,bs){
+  let best=null,bestDist=Infinity;
+  for(let i=-1;i<4;i++){
+    const type=i<0?'heaven':'earth',idx=Math.max(0,i);
+    const dir=pushDir(finger,col,type,idx);
+    if(!dir)continue;
+    const rect=getBeadScreenRect(col,type,idx),z=beadTipZone(rect,dir,bs);
+    if(pos.x<z.x0||pos.x>z.x1||pos.y<z.y0||pos.y>z.y1)continue;
+    const d=Math.abs(pos.y-(dir<0?rect.y+rect.h:rect.y));
+    if(d<bestDist){bestDist=d;best={col,type,idx,dir}}
+  }
+  return best;
+}
+
+function getColFromScreenX(screenX){
+  if(screenX<sorobanLeft||screenX>sorobanRight)return-1;
+  const rel=(screenX-sorobanLeft)/(sorobanRight-sorobanLeft);
+  return Math.max(0,Math.min(COLS-1,Math.floor(rel*COLS)));
+}
+
+function showError(msg){
+  document.getElementById('errorMsg').textContent=msg;
+  document.getElementById('error').style.display='flex';
+}
+
+function cameraErrorText(err){
+  if(err.name==='NotAllowedError'||err.name==='SecurityError')return'Permiso de cámara denegado. Actívalo junto a la barra de direcciones y reintenta.';
+  if(err.name==='NotFoundError'||err.name==='OverconstrainedError')return'No se encontró ninguna cámara conectada.';
+  if(err.name==='NotReadableError'||err.name==='AbortError')return'La cámara no responde. Puede estar ocupada por otra aplicación; ciérrala y reintenta.';
+  return'No se pudo acceder a la cámara: '+err.message;
+}
+
+async function startCamera(){
+  if(typeof Hands==='undefined'){showError('No se pudo cargar el detector de manos. Revisa tu conexión a internet y reintenta.');return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showError('Este navegador no permite usar la cámara aquí. Abre la app en Chrome o Edge.');return}
+  const startBtn=document.getElementById('startBtn');
+  startBtn.disabled=true;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}}});
+    video.srcObject=stream;
+    await new Promise(r=>{if(video.readyState>=1)r();else video.onloadedmetadata=r});
+    await video.play();
+    stream.getVideoTracks()[0].addEventListener('ended',()=>showError('La cámara se desconectó.'));
+  }catch(err){
+    showError(cameraErrorText(err));return;
+  }
+  document.getElementById('startScreen').style.display='none';
+  resizeCanvas();
+  setGestureLabel('hold','Cargando detector de manos...');
+  try{
+    await initMediaPipe();
+  }catch(err){
+    showError('No se pudo iniciar el detector de manos: '+err.message);
+  }
+}
+
+function resizeCanvas(){
+  canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+  scaleSoroban();
+}
+
+async function initMediaPipe(){
+  const hands=new Hands({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'+f});
+  hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
+  hands.onResults(onHandResults);
+  await hands.initialize();
+  setGestureLabel('idle','Esperando mano...');
+  let busy=false,lastTime=-1;
+  const tick=async()=>{
+    if(busy||video.readyState<2||video.currentTime===lastTime)return;
+    busy=true;lastTime=video.currentTime;
+    try{await hands.send({image:video})}
+    catch(err){showError('Falló el detector de manos: '+err.message)}
+    finally{busy=false}
+  };
+  startTicker(tick);
+}
+
+// El reloj vive en un Worker porque Chrome frena los temporizadores cuando Zoom tapa o minimiza la pestana.
+function startTicker(tick){
+  try{
+    const code='setInterval(()=>postMessage(0),'+TICK_MS+')';
+    const worker=new Worker(URL.createObjectURL(new Blob([code],{type:'text/javascript'})));
+    worker.onmessage=tick;
+    worker.onerror=()=>{worker.terminate();setInterval(tick,TICK_MS)};
+  }catch(e){
+    setInterval(tick,TICK_MS);
+  }
+}
+
+function videoToScreen(normX,normY){
+  const vw=video.videoWidth||1280,vh=video.videoHeight||720;
+  const cw=canvas.width,ch=canvas.height;
+  const scale=Math.max(cw/vw,ch/vh);
+  const dw=vw*scale,dh=vh*scale;
+  const ox=(cw-dw)/2,oy=(ch-dh)/2;
+  return{x:(1-normX)*dw+ox,y:normY*dh+oy};
+}
+
+function smoothed(idx,frames){
+  const n=landmarkHistory.length;
+  if(n===0)return null;
+  const from=Math.max(0,n-frames);
+  let sx=0,sy=0;
+  for(let i=from;i<n;i++){sx+=landmarkHistory[i][idx].x;sy+=landmarkHistory[i][idx].y}
+  return videoToScreen(sx/(n-from),sy/(n-from));
+}
+
+function getVisual(idx){return smoothed(idx,5)}
+function getLogic(idx){return smoothed(idx,3)}
+
+function onHandResults(results){
+  const lm=results.multiHandLandmarks&&results.multiHandLandmarks[0];
+  const now=Date.now();
+  countFrame();
+  if(lm){
+    lastHandAt=now;
+    noHandMsg.style.display='none';
+    landmarkHistory.push(lm);
+    if(landmarkHistory.length>5)landmarkHistory.shift();
+    drawHand();
+    processInteraction();
+    renderDiag();
+    return;
+  }
+  // MediaPipe pierde la mano algunos cuadros sueltos: eso no debe cancelar el gesto en curso.
+  if(now-lastHandAt<HAND_GRACE)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(diagOn)drawDiagZones();
+  noHandMsg.style.display='block';
+  landmarkHistory=[];
+  sweep=null;
+  closeAttempt();
+  resetSlots();
+  setMascot(now-lastHandAt>SLEEP_AFTER?'sleep':'awake');
+  showIdle('Esperando mano...');
+  renderDiag();
+}
+
+function drawHand(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(diagOn)drawDiagZones();
+  const pts=[];
+  for(let i=0;i<21;i++)pts.push(getVisual(i));
+
+  ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(0,255,180,0.6)';
+  ctx.beginPath();
+  for(const[a,b]of HAND_CONNECTIONS){ctx.moveTo(pts[a].x,pts[a].y);ctx.lineTo(pts[b].x,pts[b].y)}
+  ctx.stroke();
+
+  ctx.strokeStyle='#fff';ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(pts[4].x,pts[4].y,12,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,80,80,0.85)';ctx.fill();ctx.stroke();
+
+  ctx.beginPath();ctx.arc(pts[8].x,pts[8].y,12,0,Math.PI*2);
+  ctx.fillStyle='rgba(80,180,255,0.85)';ctx.fill();ctx.stroke();
+}
+
+// Los estados con bloqueo (feliz, pista) se sostienen un momento; el resto no los interrumpe.
+function setMascot(state,text='',lockMs=0){
+  const now=Date.now();
+  if(!lockMs&&now<mascotLock)return;
+  if(lockMs)mascotLock=now+lockMs;
+  const talk=text&&now>=mascotTalkAt;
+  if(talk){mascotTalkAt=now+MASCOT_TALK_GAP;mascotBubble.textContent=text}
+  const key=state+(talk?' talk':'');
+  if(key!==mascotKey){mascotKey=key;mascot.className=key}
+}
+
+function cheerMascot(){
+  rejectCount=0;pendingReason='';
+  setMascot('happy',CHEERS[Math.floor(Math.random()*CHEERS.length)],MASCOT_LOCK);
+}
+
+function hintMascot(text){
+  mascotTalkAt=0;
+  setMascot('hint',text,MASCOT_LOCK);
+}
+
+// Al terminar un intento fallido cuenta el ultimo motivo, no los intermedios del empuje.
+function closeAttempt(){
+  if(!pendingReason)return;
+  const hint=HINTS[pendingReason];
+  pendingReason='';
+  if(!hint||++rejectCount<HINT_AFTER)return;
+  rejectCount=0;
+  hintMascot(hint);
+}
+
+function setGestureLabel(type,text){
+  const now=Date.now();
+  if(type==='ok')okUntil=now+OK_LABEL_MS;
+  else if(now<okUntil)return;
+  if(gestureLabel.textContent!==text)gestureLabel.textContent=text;
+  const cls=type==='idle'?'hud-box':'hud-box '+type;
+  if(gestureLabel.className!==cls)gestureLabel.className=cls;
+}
+
+function canApplyCol(col){
+  const now=Date.now();
+  const last=colLastAction[col]||0;
+  return(now-last)>=ACTION_COOLDOWN;
+}
+
+function plural(n){return n+(n===1?' cuenta':' cuentas')}
+function isConfirmed(s,now){return!!s&&now-s.start>=TUNE.hold}
+function resetSlots(){slots.thumb=null;slots.index=null;pinchStart=0}
+function fingerCol(pos){return pos.y<sorobanTop||pos.y>sorobanBottom?-1:getColFromScreenX(pos.x)}
+
+// El dedo mas a la izquierda marca la columna; un gesto confirmado la conserva hasta terminar.
+function pickLeadCol(pos,now){
+  const held=[slots.thumb,slots.index].find(s=>isConfirmed(s,now));
+  if(held)return held.col;
+  const on=[fingerCol(pos.thumb),fingerCol(pos.index)].filter(c=>c>=0);
+  return on.length?Math.min(...on):-1;
+}
+
+// El trayecto solo cuenta al salir de la zona de reposo, para que el temblor no parezca zigzag.
+function trackPath(s,pos,bs,now){
+  if(Math.hypot(pos.x-s.pos.x,pos.y-s.pos.y)<=TUNE.tolerance*bs.y){s.path=0;s.moveStart=0;s.last={x:pos.x,y:pos.y};return}
+  if(!s.moveStart)s.moveStart=now;
+  const step=Math.hypot(pos.x-s.last.x,pos.y-s.last.y);
+  if(step>=PATH_STEP*bs.y){s.path+=step;s.last={x:pos.x,y:pos.y}}
+}
+
+// Mientras el dedo se desplaza la espera se reinicia; el gesto queda anclado donde se detuvo.
+function updateSlot(finger,pos,lead,bs,now){
+  const s=slots[finger];
+  if(isConfirmed(s,now)){
+    if(getColFromScreenX(pos.x)===s.col)trackPath(s,pos,bs,now);
+    else slots[finger]=null;
+    return;
+  }
+  const t=fingerCol(pos)===lead?findPushableBead(finger,pos,lead,bs):null;
+  if(!t){slots[finger]=null;return}
+  const still=s&&s.type===t.type&&s.idx===t.idx&&Math.hypot(pos.x-s.pos.x,pos.y-s.pos.y)<=TUNE.tolerance*bs.y;
+  if(still)return;
+  slots[finger]={finger,col:t.col,type:t.type,idx:t.idx,dir:t.dir,start:now,pos:{x:pos.x,y:pos.y},last:{x:pos.x,y:pos.y},path:0,moveStart:0};
+}
+
+function pushMetrics(s,pos,bs,now){
+  const net=(pos.y-s.pos.y)*s.dir;
+  const secs=Math.max(TICK_MS,now-s.moveStart)/1000;
+  return{s,net,straight:net>0?net/Math.max(net,s.path):0,speed:net>0&&s.moveStart?net/bs.y/secs:0};
+}
+
+function isCombo(a,b){return[a,b].some(s=>s.finger==='thumb'&&s.type==='earth')&&[a,b].some(s=>s.finger==='index'&&s.type==='heaven')}
+function needsPartner(s){return s.finger==='thumb'&&s.dir>0}
+function earthTarget(s){return s.dir<0?s.idx+1:s.idx}
+function earthVerb(s){return FINGER_NAME[s.finger]+(s.dir<0?' → sumar ':' → restar ')}
+
+function rejectReason(m,pos,bs){
+  const p=pos[m.s.finger];
+  if(Math.hypot(p.x-m.s.pos.x,p.y-m.s.pos.y)<=TUNE.tolerance*bs.y)return'';
+  if(m.net<=0)return'dirección incorrecta';
+  if(m.net<TUNE.travel*bs.y)return'recorrido corto';
+  if(m.straight<TUNE.straight)return'movimiento poco definido';
+  return'muy lento';
+}
+
+// Decide que gestos se aplican: los dos si son combinacion y estan definidos; si no, el mas largo y definido.
+function decidePush(active,pos,bs,now){
+  const held=active.filter(s=>isConfirmed(s,now)).map(s=>pushMetrics(s,pos[s.finger],bs,now)).sort((a,b)=>b.net-a.net);
+  if(!held.length)return{fire:[],reason:''};
+  const need=TUNE.travel*bs.y,isDefined=m=>m.net>=need&&m.straight>=TUNE.straight&&m.speed>=TUNE.speed;
+  const[first,second]=held;
+  if(!isDefined(first))return{fire:[],reason:rejectReason(first,pos,bs)};
+  if(!canApplyCol(first.s.col))return{fire:[],reason:'espera entre acciones'};
+  if(!second)return needsPartner(first.s)?{fire:[],reason:'el pulgar solo baja junto con el índice'}:{fire:[first.s],reason:''};
+  if(isCombo(first.s,second.s)){
+    if(isDefined(second))return{fire:[first.s,second.s],reason:''};
+    if(second.net>=need/2&&second.straight>=TUNE.straight){
+      if(!pinchStart)pinchStart=now;
+      if(now-pinchStart<PINCH_WINDOW)return{fire:[],reason:'esperando al otro dedo'};
+    }
+    if(needsPartner(first.s))return{fire:[],reason:'el pulgar solo baja junto con el índice'};
+    return{fire:[first.s],reason:''};
+  }
+  if(second.net*TUNE.dominance<=first.net)return{fire:[first.s],reason:''};
+  return{fire:[],reason:'empate'};
+}
+
+function applyPush(fire,now){
+  const col=fire[0].col,st=state[col],parts=[];
+  for(const s of fire){
+    if(s.type==='heaven'){
+      st.heaven=st.heaven?0:1;
+      parts.push('Índice → cuenta superior '+(st.heaven?'activada':'desactivada'));
+    }else{
+      const target=earthTarget(s);
+      parts.push(earthVerb(s)+plural(Math.abs(target-st.earth)));
+      st.earth=target;
+    }
+  }
+  renderCol(col);
+  colLastAction[col]=now;
+  refreshValue();
+  flashCol(col);
+  const text=parts.join(' · ');
+  setGestureLabel('ok',text);
+  diagDecision='Aplicado: '+text;
+  cheerMascot();
+}
+
+function setTouchedBeads(els){
+  if(els.length===touchedEls.length&&els.every((e,i)=>e===touchedEls[i]))return;
+  touchedEls.forEach(e=>e.classList.remove('touched'));
+  els.forEach(e=>e.classList.add('touched'));
+  touchedEls=els;
+}
+
+function showColIndicator(col,ready,bs){
+  const key=col+(ready?'r':'');
+  if(key===indicatorKey)return;
+  indicatorKey=key;
+  const s=colIndicator.style;
+  s.display='block';
+  s.left=(sorobanLeft+col*COL_W*bs.x)+'px';s.top=sorobanTop+'px';
+  s.width=(COL_W*bs.x)+'px';s.height=(sorobanBottom-sorobanTop)+'px';
+  s.borderColor=ready?'rgba(34,197,94,0.95)':'rgba(255,225,80,0.9)';
+  s.background=ready?'rgba(34,197,94,0.15)':'rgba(255,225,80,0.08)';
+}
+
+function showHold(progress){
+  holdBar.style.display='block';
+  holdFill.style.width=(progress*100)+'%';
+}
+
+function showIdle(text){
+  setActiveCol(null);setTouchedBeads([]);
+  holdBar.style.display='none';
+  if(indicatorKey){indicatorKey='';colIndicator.style.display='none'}
+  setGestureLabel('idle',text);
+}
+
+function actionText(s){
+  if(s.type==='heaven')return'Índice → cuenta superior';
+  return earthVerb(s)+plural(Math.abs(earthTarget(s)-state[s.col].earth));
+}
+
+function moveText(s){
+  if(s.type==='heaven')return'Índice: empuja la cuenta superior '+(s.dir>0?'ABAJO':'ARRIBA');
+  return s.dir<0?'Pulgar: mueve ARRIBA para sumar':FINGER_NAME[s.finger]+': mueve ABAJO para restar';
+}
+
+// Todas las cuentas que se moverian: empujar una arrastra las que tiene delante.
+function beadsToMove(s){
+  const k=cols[s.col];
+  if(s.type==='heaven')return[k.heaven];
+  const earth=state[s.col].earth;
+  return s.dir<0?k.earth.slice(earth,s.idx+1):k.earth.slice(s.idx,earth);
+}
+
+function showGesture(active,lead,bs,now){
+  const longest=active.reduce((a,b)=>a.start<=b.start?a:b);
+  const ready=isConfirmed(longest,now);
+  setActiveCol(lead);
+  showHold(Math.min(1,(now-longest.start)/TUNE.hold));
+  showColIndicator(lead,ready,bs);
+  setTouchedBeads(active.flatMap(beadsToMove));
+  if(ready)setGestureLabel('hold',active.map(moveText).join(' · '));
+  else setGestureLabel('hold',active.map(actionText).join(' · ')+' — mantén');
+}
+
+// Barrido: con los dos dedos juntos sobre la viga, cada columna que recorren queda en 0.
+// Exige posarse un instante y avanzar media columna para no competir con empujar una cuenta.
+function handleSweep(thumbPos,indexPos,bs,now){
+  const slack=sweep&&sweep.active?1.5:1;
+  const band=BEAM_BAND*bs.y*slack,colW=COL_W*bs.x;
+  const onBeam=Math.abs(thumbPos.y-beamScreenY)<band&&Math.abs(indexPos.y-beamScreenY)<band;
+  const together=Math.abs(thumbPos.x-indexPos.x)<=colW*slack;
+  const x=(thumbPos.x+indexPos.x)/2,col=getColFromScreenX(x);
+  if(!onBeam||!together||col<0){sweep=null;return false}
+  if(!sweep)sweep={start:now,x,col,active:false};
+  if(!sweep.active){
+    if(now-sweep.start<SWEEP_ARM||Math.abs(x-sweep.x)<colW/2)return false;
+    sweep.active=true;
+    resetSlots();
+    clearCols(sweep.col,sweep.col,now);
+  }
+  clearCols(sweep.col,col,now);
+  sweep.col=col;
+  setActiveCol(col);setTouchedBeads([]);
+  holdBar.style.display='none';
+  showColIndicator(col,true,bs);
+  setGestureLabel('hold','Borrando columna '+(COLS-col));
+  return true;
+}
+
+function clearCols(from,to,now){
+  let cleared=false;
+  for(let c=Math.min(from,to);c<=Math.max(from,to);c++){
+    colLastAction[c]=now;
+    if(!state[c].heaven&&!state[c].earth)continue;
+    state[c].heaven=0;state[c].earth=0;
+    renderCol(c);flashCol(c);cleared=true;
+    diagDecision='Aplicado: columna '+(COLS-c)+' en 0';
+  }
+  refreshValue();
+  if(cleared)cheerMascot();
+}
+
+function processInteraction(){
+  const pos={thumb:getLogic(4),index:getLogic(8)};
+  if(!pos.thumb||!pos.index)return;
+  const bs=getBoardScale(),now=Date.now();
+
+  if(handleSweep(pos.thumb,pos.index,bs,now))return;
+
+  const lead=pickLeadCol(pos,now);
+  if(lead<0){closeAttempt();offTipSince=0;resetSlots();setMascot('awake');showIdle('Esperando...');return}
+  updateSlot('index',pos.index,lead,bs,now);
+  updateSlot('thumb',pos.thumb,lead,bs,now);
+  const active=[slots.thumb,slots.index].filter(Boolean);
+  if(!active.length){
+    closeAttempt();
+    if(!offTipSince)offTipSince=now;
+    if(now-offTipSince>=OFF_TIP_HINT){offTipSince=0;hintMascot('Empuja desde la punta')}
+    setMascot('awake');
+    setActiveCol(lead);setTouchedBeads([]);
+    holdBar.style.display='none';
+    showColIndicator(lead,false,bs);
+    setGestureLabel('idle','Busca la punta de la cuenta');
+    return;
+  }
+
+  offTipSince=0;
+  const{fire,reason}=decidePush(active,pos,bs,now);
+  if(fire.length){applyPush(fire,now);resetSlots();showIdle('Esperando...');return}
+  if(reason){diagDecision='Rechazado: '+reason;pendingReason=reason}
+  setMascot('focus');
+  showGesture(active,lead,bs,now);
+}
+
+function describeFinger(finger,pos,lead,now){
+  const s=slots[finger],col=fingerCol(pos);
+  if(s){
+    const m=pushMetrics(s,pos,getBoardScale(),now);
+    return(s.type==='heaven'?'cuenta superior':'cuenta inferior '+(s.idx+1))+', col '+(COLS-s.col)+
+      '\n  espera '+Math.min(TUNE.hold,now-s.start)+'/'+TUNE.hold+' ms, avance '+Math.round(m.net)+' px, rectitud '+m.straight.toFixed(2)+', velocidad '+Math.round(m.speed)+' px/s';
+  }
+  if(col<0)return'fuera del tablero';
+  return col===lead?'fuera de la punta':'inactivo: columna de la izquierda';
+}
+
+function renderDiag(){
+  if(!diagOn)return;
+  const pos={thumb:getLogic(4),index:getLogic(8)},now=Date.now();
+  const hand=pos.thumb&&pos.index;
+  document.getElementById('diagText').textContent=
+    'Columna: '+(activeCol===null?'-':COLS-activeCol)+'   Cuadros/s: '+diagFps+
+    '\nPulgar: '+(hand?describeFinger('thumb',pos.thumb,activeCol,now):'sin mano')+
+    '\nÍndice: '+(hand?describeFinger('index',pos.index,activeCol,now):'sin mano')+
+    '\nDecisión: '+diagDecision;
+}
+
+function drawDiagZones(){
+  const bs=getBoardScale();
+  ctx.lineWidth=1;
+  for(const[finger,color]of[['thumb','255,80,80'],['index','80,180,255']]){
+    ctx.fillStyle='rgba('+color+',0.3)';ctx.strokeStyle='rgba('+color+',0.9)';
+    for(let c=0;c<COLS;c++)for(let i=-1;i<4;i++){
+      const type=i<0?'heaven':'earth',idx=Math.max(0,i),dir=pushDir(finger,c,type,idx);
+      if(!dir)continue;
+      const z=beadTipZone(getBeadScreenRect(c,type,idx),dir,bs);
+      ctx.fillRect(z.x0,z.y0,z.x1-z.x0,z.y1-z.y0);
+      ctx.strokeRect(z.x0,z.y0,z.x1-z.x0,z.y1-z.y0);
+    }
+  }
+}
+
+function countFrame(){
+  const now=Date.now();
+  if(now-fpsStart>=1000){diagFps=fpsFrames;fpsFrames=0;fpsStart=now}
+  fpsFrames++;
+}
+
+function syncDiagInputs(){
+  for(const k in diagInputs){diagInputs[k].input.value=TUNE[k];diagInputs[k].out.textContent=TUNE[k]}
+}
+
+function buildDiag(){
+  const help=document.getElementById('diagHelp');
+  for(const[key,label,min,max,step,meaning]of TUNE_FIELDS){
+    const row=document.createElement('label'),name=document.createElement('span'),out=document.createElement('span'),input=document.createElement('input');
+    name.textContent=label;
+    input.type='range';input.min=min;input.max=max;input.step=step;
+    input.addEventListener('input',()=>{TUNE[key]=+input.value;out.textContent=input.value;saveTune()});
+    row.appendChild(name);row.appendChild(out);row.appendChild(input);
+    row.addEventListener('mouseenter',()=>{help.textContent=meaning});
+    row.addEventListener('mouseleave',()=>{help.textContent=HELP_IDLE});
+    document.getElementById('diagSliders').appendChild(row);
+    diagInputs[key]={input,out};
+  }
+  syncDiagInputs();
+  document.getElementById('diagReset').addEventListener('click',()=>{Object.assign(TUNE,TUNE_DEFAULTS);syncDiagInputs();saveTune()});
+}
+
+function toggleDiag(){
+  diagOn=!diagOn;
+  document.getElementById('diag').style.display=diagOn?'block':'none';
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(diagOn)drawDiagZones();
+  renderDiag();
+}
+
+window.addEventListener('resize',resizeCanvas);
+document.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const key=e.key.toLowerCase();
+  if(key==='d')toggleDiag();
+  else if(key==='m')mascot.style.display=mascot.style.display==='none'?'':'none';
+});
+document.getElementById('startBtn').addEventListener('click',startCamera);
+buildSoroban();
+buildDiag();
+document.getElementById('startMascot').appendChild(document.getElementById('mascotArt').cloneNode(true));
+</script>
+</body>
+</html>
