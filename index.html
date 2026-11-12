@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <!-- Privacidad: la pagina solo puede cargar codigo propio y la version fijada de MediaPipe, y no puede enviar datos a otros sitios -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/; img-src 'self' data: blob:; media-src 'self' file: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -99,7 +99,8 @@ button{font:inherit;cursor:pointer}
 .coll-card button.inuse{background:var(--ui-accent);color:#1b1200}
 
 /* ---------- Juego ---------- */
-#game{display:none}
+#game{display:none;touch-action:none}
+html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 #game.on{display:block}
 #video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);z-index:1;background:#0b1729}
 #overlay{position:fixed;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
@@ -155,7 +156,7 @@ button{font:inherit;cursor:pointer}
 #colIndicator{position:fixed;z-index:4;pointer-events:none;border:3px solid rgba(255,225,80,.9);border-radius:12px;background:rgba(255,225,80,.08);transition:left .1s,top .1s,width .1s,height .1s,border-color .3s,background .3s;display:none}
 #error{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;color:#fff;text-align:center;padding:20px;font-size:1.2rem;flex-direction:column;gap:12px}
 #error button{padding:10px 30px;border:0;border-radius:999px;background:var(--ui-accent);color:#1b1200}
-#diag{position:fixed;top:64px;right:12px;z-index:20;width:330px;max-height:calc(100% - 110px);overflow:auto;display:none;background:rgba(20,16,50,.94);color:#eee;padding:10px 12px;border-radius:16px;font-size:.78rem;font-family:'Segoe UI',sans-serif}
+#diag{position:fixed;top:64px;right:12px;z-index:20;width:min(330px,94vw);max-height:calc(100% - 110px);overflow:auto;display:none;background:rgba(20,16,50,.94);color:#eee;padding:10px 12px;border-radius:16px;font-size:.78rem;font-family:'Segoe UI',sans-serif}
 #diag b{color:#FFC300}
 #diagText{white-space:pre-wrap;font-family:Consolas,monospace;font-size:.74rem;line-height:1.4;margin:6px 0 8px}
 #diagSliders label{display:grid;grid-template-columns:1fr 44px;gap:0 8px;margin-bottom:6px}
@@ -213,7 +214,7 @@ body.skin-navidad .m-hat{display:block}
 /* ---------- Tutorial ---------- */
 #tutorial{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(3,8,16,.72)}
 #tutorial.on{display:flex}
-.tut-panel{width:min(720px,94vw);background:var(--ui-panel);border:2px solid var(--ui-accent);border-radius:26px;padding:18px 22px;display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.tut-panel{max-height:94vh;overflow:auto;width:min(720px,94vw);background:var(--ui-panel);border:2px solid var(--ui-accent);border-radius:26px;padding:18px 22px;display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 #tutTitle{grid-column:1/3;font-size:1.5rem;color:var(--ui-accent);text-align:center}
 #tutArt svg{width:240px;height:auto;display:block;overflow:visible}
 #tutArt .tb{transition:transform .8s cubic-bezier(.4,0,.2,1)}
@@ -224,7 +225,26 @@ body.skin-navidad .m-hat{display:block}
 #tutSteps i.on{background:var(--ui-accent)}
 .tut-btns{grid-column:1/3;display:flex;gap:10px;justify-content:center}
 .tut-btns .menu-btn{min-width:0}
-@media(max-width:640px){.tut-panel{grid-template-columns:1fr}#tutArt{justify-self:center}#tutTitle,#tutSteps,.tut-btns{grid-column:1}}
+@media(max-width:640px){.tut-panel{grid-template-columns:1fr;padding:14px}#tutArt{justify-self:center}#tutArt svg{width:min(200px,52vw)}#tutTitle,#tutSteps,.tut-btns{grid-column:1}#tutTitle{font-size:1.2rem}#tutCaption{font-size:1.05rem;min-height:5em}}
+
+/* ---------- Celular y tablet ----------
+   data-layout lo pone scaleSoroban(): wide (computador o tablet horizontal), portrait (celular o tablet vertical),
+   short (celular horizontal: poca altura). */
+[data-layout=portrait] #side{left:8px;right:8px;width:auto;min-width:0;flex-direction:row;align-items:stretch}
+[data-layout=portrait] #exercise{flex:1.3;padding:6px 10px}
+[data-layout=portrait] #exOp{font-size:2rem;margin:0}
+[data-layout=portrait] #hintCard{flex:1;height:auto;min-height:88px}
+[data-layout=short] #side{width:min(230px,30vw);min-width:150px}
+[data-layout=short] #exOp{font-size:1.7rem;margin:0}
+[data-layout=short] #hintCard{height:72px}
+[data-layout=portrait] #mascot,[data-layout=short] #mascot,[data-layout=portrait] #guide,[data-layout=short] #guide,[data-layout=portrait] #colDisplay,[data-layout=short] #colDisplay,[data-layout=portrait] #userChip,[data-layout=portrait] .tb-gap{display:none}
+[data-layout=portrait] #gestureLabel,[data-layout=short] #gestureLabel{top:auto;bottom:10px;font-size:.9rem;max-width:92vw;padding:5px 12px}
+[data-layout=portrait] #holdBar,[data-layout=short] #holdBar{top:auto;bottom:50px}
+[data-layout=portrait] #topbar,[data-layout=short] #topbar{gap:5px;padding:6px 8px}
+[data-layout=portrait] .tb-btn,[data-layout=short] .tb-btn,[data-layout=portrait] .tb-chip,[data-layout=short] .tb-chip{padding:4px 9px;font-size:.82rem}
+[data-layout=portrait] #valueDisplay,[data-layout=short] #valueDisplay{font-size:1rem;min-width:0;padding:4px 10px}
+[data-layout=portrait] #noHandMsg{top:62%}
+@media(max-width:420px){.tb-group span{display:none}}
 </style>
 </head>
 <body class="skin-navidad">
@@ -429,6 +449,17 @@ const HAND_GRACE=250;
 const OK_LABEL_MS=900;
 const TICK_MS=33;
 const FIST_DWELL=400;
+// Suavizado por tiempo y no por cuadros: en equipos lentos promediar 3 cuadros agregaba hasta 0,3 s de retraso.
+const LOGIC_MS=100,VISUAL_MS=160;
+// Celulares, tablets y equipos de pocos nucleos usan el modelo rapido de MediaPipe y la camara a 640x480.
+let LOW_POWER=(()=>{
+  try{
+    const ua=String(navigator.userAgent||'');
+    return/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)||(navigator.maxTouchPoints>1&&/Macintosh/.test(ua))||(navigator.hardwareConcurrency||8)<=4;
+  }catch(e){return false}
+})();
+let modelComplexity=LOW_POWER?0:1;
+const SLOW_FPS=15,SLOW_SECONDS=3;
 
 // ---------- Mascota ----------
 const MASCOT_LOCK=1300;
@@ -618,12 +649,18 @@ function smoothed(idx,frames){
   return videoToScreen(sx/(n-from),sy/(n-from));
 }
 
-function getVisual(idx){return smoothed(idx,5)}
-function getLogic(idx){return smoothed(idx,3)}
+// Cuadros a promediar segun el tiempo entre resultados: a 30 cuadros/s son 5 (dibujo) y 3 (logica), como antes;
+// en equipos lentos se promedian menos para no agregar retraso.
+let frameDt=TICK_MS,lastResultAt=0;
+function framesFor(ms,max){return Math.max(1,Math.min(max,Math.round(ms/frameDt)))}
+function getVisual(idx){return smoothed(idx,framesFor(VISUAL_MS,5))}
+function getLogic(idx){return smoothed(idx,framesFor(LOGIC_MS,3))}
 
 function onHandResults(results){
   const lm=results.multiHandLandmarks&&results.multiHandLandmarks[0];
   const now=Date.now();
+  if(lastResultAt)frameDt=frameDt*.8+Math.min(250,Math.max(5,now-lastResultAt))*.2;
+  lastResultAt=now;
   countFrame();
   if(lm){
     lastHandAt=now;
@@ -965,7 +1002,8 @@ function renderDiag(){
   const pos={thumb:getLogic(4),index:getLogic(8)},now=Date.now();
   const hand=pos.thumb&&pos.index;
   document.getElementById('diagText').textContent=
-    'Columna: '+(activeCol===null?'-':COLS-activeCol)+'   Cuadros/s: '+diagFps+
+    'Columna: '+(activeCol===null?'-':COLS-activeCol)+'   Cuadros/s: '+diagFps+'   Modelo: '+(modelComplexity?'preciso':'rápido')+
+    '\nEntre cuadros: '+Math.round(frameDt)+' ms   Promedio: '+framesFor(LOGIC_MS,3)+' cuadros'+(LOW_POWER?'   (equipo de poca potencia)':'')+
     '\nPulgar: '+(hand?describeFinger('thumb',pos.thumb,activeCol,now):'sin mano')+
     '\nÍndice: '+(hand?describeFinger('index',pos.index,activeCol,now):'sin mano')+
     '\nDecisión: '+diagDecision;
@@ -988,7 +1026,7 @@ function drawDiagZones(){
 
 function countFrame(){
   const now=Date.now();
-  if(now-fpsStart>=1000){diagFps=fpsFrames;fpsFrames=0;fpsStart=now}
+  if(now-fpsStart>=1000){diagFps=fpsFrames;fpsFrames=0;fpsStart=now;checkPerformance(diagFps)}
   fpsFrames++;
 }
 
@@ -1066,14 +1104,36 @@ function drawFrameDeco(){
   deco.innerHTML=sk.deco?sk.deco(w,h):'';
 }
 
-// El soroban ocupa la zona izquierda y central (la derecha queda para la tarjeta y la mascota),
-// centrado en ella y tan grande como permita el alto; con pocas columnas crece para que sea facil acertar.
-function scaleSoroban(){
+// Distribucion segun la pantalla: wide (computador o tablet horizontal), portrait (celular o tablet vertical)
+// y short (celular horizontal, poca altura).
+function layoutMode(){
   const W=window.innerWidth,H=window.innerHeight;
+  return W<H?'portrait':H<600?'short':'wide';
+}
+
+function rectBottom(id,fallback){
+  const r=document.getElementById(id).getBoundingClientRect();
+  return r&&r.bottom>0?r.bottom:fallback;
+}
+
+// El soroban queda centrado en su zona y tan grande como permita el alto; con pocas columnas crece para que
+// sea facil acertar. En wide la derecha es para la tarjeta y la mascota; en portrait la tarjeta va arriba.
+function scaleSoroban(){
+  const W=window.innerWidth,H=window.innerHeight,mode=layoutMode();
+  const root=document.documentElement;
+  if(root.setAttribute)root.setAttribute('data-layout',mode);
+  const tb=rectBottom('topbar',mode==='wide'?52:48);
+  const side=document.getElementById('side'),pop=document.getElementById('formulaPop');
+  side.style.top=(mode==='wide'?64:tb+6)+'px';
+  pop.style.top=(tb+4)+'px';
   const fw=COLS*COL_W+FRAME_PAD*2,fh=INNER_H+FRAME_PAD*2;
-  const regionL=W*.04,regionW=W*.74;
-  const scale=Math.min(MAX_SCALE,regionW/fw,(H*.86-HUD_SPACE)/fh);
+  let regionL,regionW,top,bottom;
+  if(mode==='portrait'){regionL=W*.03;regionW=W*.94;top=Math.max(rectBottom('side',tb+100),tb+100)+62;bottom=H*.03+44}
+  else if(mode==='short'){regionL=W*.02;regionW=W*.66;top=tb+44;bottom=H*.03+36}
+  else{regionL=W*.04;regionW=W*.74;top=HUD_SPACE;bottom=H*.14}
+  const scale=Math.max(.3,Math.min(MAX_SCALE,regionW/fw,(H-bottom-top)/fh));
   sorobanWrap.style.left=(regionL+(regionW-fw*scale)/2)+'px';
+  sorobanWrap.style.bottom=bottom+'px';
   sorobanWrap.style.transform='scale('+scale+')';
   updateSorobanBounds();
 }
@@ -1102,7 +1162,7 @@ async function startCameraStream(){
   if(typeof Hands==='undefined'){showError('No se pudo cargar el detector de manos. Revisa tu conexión a internet y reintenta.');return false}
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showError('Este navegador no permite usar la cámara aquí. Abre la app en Chrome o Edge.');return false}
   try{
-    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    const s=await navigator.mediaDevices.getUserMedia(cameraConstraints());
     if(!gameOn){s.getTracks().forEach(t=>t.stop());return false}
     stream=s;video.srcObject=s;
     await new Promise(r=>{if(video.readyState>=1)r();else video.onloadedmetadata=r});
@@ -1120,13 +1180,50 @@ function stopCamera(){
   video.srcObject=null;
 }
 
-async function initMediaPipe(){
-  if(hands){setGestureLabel('idle','Esperando mano...');return}
+// En equipos de poca potencia, menos resolucion = menos trabajo por cuadro para el detector.
+function cameraConstraints(){
+  const size=LOW_POWER?{width:{ideal:640},height:{ideal:480}}:{width:{ideal:1280},height:{ideal:720}};
+  return{video:Object.assign({facingMode:'user',frameRate:{ideal:30}},size),audio:false};
+}
+
+// El detector se descarga y se calienta (primer cuadro, que compila los sombreadores) mientras se esta en el
+// menu, para que al pulsar Jugar responda enseguida.
+let handsReady=null,tickerOn=false,warming=false;
+function loadHands(){
+  if(handsReady)return handsReady;
+  if(typeof Hands==='undefined')return Promise.reject(new Error('MediaPipe no cargó'));
   hands=new Hands({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'+f});
-  hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
-  hands.onResults(onHandResults);
-  await hands.initialize();
+  hands.setOptions({maxNumHands:1,modelComplexity,minDetectionConfidence:0.6,minTrackingConfidence:0.5});
+  hands.onResults(r=>{if(!warming)onHandResults(r)});
+  handsReady=hands.initialize().then(async()=>{
+    try{
+      const cv=document.createElement('canvas');cv.width=256;cv.height=256;
+      cv.getContext('2d').fillRect(0,0,256,256);
+      warming=true;await hands.send({image:cv});
+    }catch(e){}finally{warming=false}
+    return hands;
+  });
+  handsReady.catch(()=>{handsReady=null});
+  return handsReady;
+}
+function preloadHands(){loadHands().catch(()=>{})}
+
+// Si el detector va lento con el modelo completo, pasa solo al modelo rapido.
+let slowSeconds=0;
+function checkPerformance(fps){
+  if(!gameOn&&!hands)return;
+  if(modelComplexity===0||fps>=SLOW_FPS){slowSeconds=0;return}
+  if(++slowSeconds<SLOW_SECONDS)return;
+  modelComplexity=0;slowSeconds=0;
+  if(hands)hands.setOptions({modelComplexity:0});
+  diagDecision='Detector lento: se cambió al modelo rápido';
+}
+
+async function initMediaPipe(){
+  await loadHands();
   setGestureLabel('idle','Esperando mano...');
+  if(tickerOn)return;
+  tickerOn=true;
   let busy=false,lastTime=-1;
   const tick=async()=>{
     if(!gameOn||!stream||busy||video.readyState<2||video.currentTime===lastTime)return;
@@ -2470,6 +2567,7 @@ function showMenu(){
   document.getElementById('menuSkin').textContent='Estética: '+currentSkin().name;
   updatePointsUI();
   showScreen('menu');
+  preloadHands();
 }
 
 // ---------- Intro ----------
@@ -2588,6 +2686,7 @@ function onKey(e){
 function on(id,ev,fn){document.getElementById(id).addEventListener(ev,fn)}
 
 window.addEventListener('resize',()=>{resizeCanvas();snow.resize()});
+window.addEventListener('orientationchange',()=>setTimeout(()=>{resizeCanvas();snow.resize()},250));
 document.addEventListener('keydown',onKey);
 on('startBtn','click',onStart);
 on('createBtn','click',onCreateUser);
