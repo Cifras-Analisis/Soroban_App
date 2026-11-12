@@ -193,6 +193,10 @@ body.skin-navidad .m-hat{display:block}
 #mascot.happy .m-closed,#mascot.sleep .m-closed,#mascot.happy .m-smile{display:block}
 #mascot.hint .m-body{animation:none;transform:rotate(7deg)}
 #mascot.sleep .m-body{animation:mbob 5s ease-in-out infinite}
+/* Modo ligero: sin animaciones continuas durante el juego */
+[data-light=on] .m-body,[data-light=on] .m-eyes,[data-light=on] #mascot.sleep .m-body{animation:none}
+[data-light=on] .bead{transition:none}
+[data-light=on] #colIndicator{transition:none}
 @keyframes mbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes mblink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
 @keyframes mjump{0%,100%{transform:translateY(0) scale(1)}45%{transform:translateY(-20px) scale(1.05)}}
@@ -347,6 +351,7 @@ body.skin-navidad .m-hat{display:block}
     <span id="userChip" class="tb-chip"></span>
     <span id="pointsChip" class="tb-chip">⭐ 0</span>
     <button id="skinBtn" class="tb-btn" title="Cambiar estética">🎨</button>
+    <button id="perfBtn" class="tb-btn"></button>
     <div class="tb-gap"></div>
     <div id="methodBtns" class="tb-group"><span>Método</span></div>
     <div id="digitBtns" class="tb-group"><span>Cifras</span></div>
@@ -474,7 +479,12 @@ let LOW_POWER=(()=>{
     return/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)||(navigator.maxTouchPoints>1&&/Macintosh/.test(ua))||(navigator.hardwareConcurrency||8)<=4;
   }catch(e){return false}
 })();
-let modelComplexity=LOW_POWER?0:1;
+// Modo ligero (por defecto): modelo rapido, camara 640x480 a 15 cuadros/s, deteccion a 15 cuadros/s y menos
+// animaciones. Pensado para compartir pantalla en Zoom sin ralentizar el equipo. Se recuerda en este navegador.
+const PERF_KEY='sorobanAR.perf';
+const LIGHT_FPS=15;
+let LIGHT=(()=>{try{return localStorage.getItem(PERF_KEY)!=='quality'}catch(e){return true}})();
+let modelComplexity=LOW_POWER||LIGHT?0:1;
 const SLOW_FPS=15,SLOW_SECONDS=3;
 
 // ---------- Mascota ----------
@@ -1018,7 +1028,7 @@ function renderDiag(){
   const pos={thumb:getLogic(4),index:getLogic(8)},now=Date.now();
   const hand=pos.thumb&&pos.index;
   document.getElementById('diagText').textContent=
-    'Columna: '+(activeCol===null?'-':COLS-activeCol)+'   Cuadros/s: '+diagFps+'   Modelo: '+(modelComplexity?'preciso':'rápido')+
+    'Columna: '+(activeCol===null?'-':COLS-activeCol)+'   Cuadros/s: '+diagFps+'   Modelo: '+(modelComplexity?'preciso':'rápido')+(LIGHT?'   Modo ligero':'')+
     '\nEntre cuadros: '+Math.round(frameDt)+' ms   Promedio: '+framesFor(LOGIC_MS,3)+' cuadros'+(LOW_POWER?'   (equipo de poca potencia)':'')+
     '\nPulgar: '+(hand?describeFinger('thumb',pos.thumb,activeCol,now):'sin mano')+
     '\nÍndice: '+(hand?describeFinger('index',pos.index,activeCol,now):'sin mano')+
@@ -1198,8 +1208,35 @@ function stopCamera(){
 
 // En equipos de poca potencia, menos resolucion = menos trabajo por cuadro para el detector.
 function cameraConstraints(){
-  const size=LOW_POWER?{width:{ideal:640},height:{ideal:480}}:{width:{ideal:1280},height:{ideal:720}};
-  return{video:Object.assign({facingMode:'user',frameRate:{ideal:30}},size),audio:false};
+  const small=LOW_POWER||LIGHT;
+  const size=small?{width:{ideal:640},height:{ideal:480}}:{width:{ideal:1280},height:{ideal:720}};
+  return{video:Object.assign({facingMode:'user',frameRate:{ideal:LIGHT?LIGHT_FPS:30}},size),audio:false};
+}
+
+// En modo ligero el detector analiza como maximo LIGHT_FPS cuadros por segundo.
+let lastSendAt=-1e9;
+function shouldSend(now){
+  if(LIGHT&&now-lastSendAt<1000/LIGHT_FPS-4)return false;
+  lastSendAt=now;
+  return true;
+}
+
+function setLight(on){
+  LIGHT=on;
+  try{localStorage.setItem(PERF_KEY,on?'light':'quality')}catch(e){}
+  modelComplexity=LOW_POWER||on?0:1;
+  if(hands)hands.setOptions({modelComplexity});
+  refreshPerfUI();
+  // La camara cambia de resolucion y de ritmo: se reabre si el juego esta en curso.
+  if(gameOn&&stream){stopCamera();startCameraStream()}
+}
+
+function refreshPerfUI(){
+  const root=document.documentElement;
+  if(root.setAttribute)root.setAttribute('data-light',LIGHT?'on':'off');
+  const b=document.getElementById('perfBtn');
+  b.textContent=LIGHT?'⚡ Ligero':'✨ Calidad';
+  b.title=LIGHT?'Modo ligero: menos carga para el equipo y para Zoom. Clic para pasar a calidad.':'Modo calidad: detección más precisa, pero más carga. Clic para pasar a ligero.';
 }
 
 // El detector se descarga y se calienta (primer cuadro, que compila los sombreadores) mientras se esta en el
@@ -1243,6 +1280,7 @@ async function initMediaPipe(){
   let busy=false,lastTime=-1;
   const tick=async()=>{
     if(!gameOn||!stream||busy||video.readyState<2||video.currentTime===lastTime)return;
+    if(!shouldSend(performance.now()))return;
     busy=true;lastTime=video.currentTime;
     try{await hands.send({image:video})}
     catch(err){showError('Falló el detector de manos: '+err.message)}
@@ -2756,6 +2794,7 @@ on('switchBtn','click',showUsers);
 on('skinPrev','click',()=>cycleSkin(-1));
 on('skinNext','click',()=>cycleSkin(1));
 on('skinBtn','click',()=>toggleSkinPop());
+on('perfBtn','click',()=>setLight(!LIGHT));
 on('gachaBack','click',showMenu);
 on('collBack','click',showMenu);
 on('pullBtn','click',onPull);
@@ -2773,6 +2812,7 @@ applySkin('navidad');
 setColumns(COLS);
 buildDiag();
 buildOptionButtons();
+refreshPerfUI();
 buildAvatarPick();
 buildIntro();
 snow.set(true);
