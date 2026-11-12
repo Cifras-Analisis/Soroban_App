@@ -73,7 +73,10 @@ button{font:inherit;cursor:pointer}
 .menu-title{font-size:clamp(2rem,5vw,3.1rem);z-index:56}
 .menu-btns{display:flex;flex-direction:column;gap:8px;align-items:center;z-index:56}
 .av,.chip,.user-open .av{font-family:'Arial Rounded MT Bold','Trebuchet MS','Segoe UI','Segoe UI Emoji',sans-serif}
-#menuSkin{font-size:.9rem;color:var(--ui-muted);z-index:56}
+#menuSkin{display:flex;align-items:center;gap:10px;z-index:56;color:var(--ui-muted);font-size:.95rem}
+#menuSkin .tb-btn{width:38px;height:38px;padding:0;display:flex;align-items:center;justify-content:center;font-size:1rem}
+#menuSkin .tb-btn:disabled{opacity:.35;cursor:default}
+#skinName{min-width:190px;text-align:center}
 
 /* ---------- Regalos y coleccion ---------- */
 #gacha h2,#collection h2{font-size:2rem;color:var(--ui-accent);z-index:56}
@@ -97,6 +100,7 @@ button{font:inherit;cursor:pointer}
 .coll-card.locked .art{filter:brightness(0) opacity(.45)}
 .coll-card button{padding:5px 14px;border-radius:999px;border:1px solid var(--ui-border);background:var(--ui-panel2);color:var(--ui-text)}
 .coll-card button.inuse{background:var(--ui-accent);color:#1b1200}
+.coll-card:not(.locked){cursor:pointer}
 
 /* ---------- Juego ---------- */
 #game{display:none;touch-action:none}
@@ -141,6 +145,13 @@ html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 @keyframes labelpop{0%{transform:translateX(-50%) scale(.9)}55%{transform:translateX(-50%) scale(1.08)}100%{transform:translateX(-50%) scale(1)}}
 #formulaPop{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:14;display:none;width:min(720px,96vw);background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:20px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
 #formulaPop.on{display:block}
+#skinPop{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:14;display:none;width:min(720px,96vw);max-height:70vh;overflow:auto;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:20px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#skinPop.on{display:block}
+#skinPop h3{color:var(--ui-accent);font-size:1.15rem;margin-bottom:8px}
+#skinGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.skin-pick{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;border-radius:14px;border:2px solid transparent;background:var(--ui-panel2);color:var(--ui-text);font-size:.78rem}
+.skin-pick svg{width:72px;height:72px}
+.skin-pick.on{border-color:var(--ui-accent);background:rgba(255,255,255,.12)}
 #formulaPop h3{color:var(--ui-accent);font-size:1.15rem;margin-bottom:4px}
 .fp-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .fp-key{display:flex;flex-direction:column;align-items:center;min-width:54px;padding:4px 6px;border-radius:12px;border:1px solid var(--ui-border);background:var(--ui-panel2);color:var(--ui-text)}
@@ -279,7 +290,7 @@ body.skin-navidad .m-hat{display:block}
   <div class="menu-head"><span id="menuUser" class="chip"></span><span id="menuPoints" class="chip pts"></span></div>
   <div id="menuShowcase"></div>
   <h1 class="menu-title title">AR Soroban</h1>
-  <div id="menuSkin"></div>
+  <div id="menuSkin"><button id="skinPrev" class="tb-btn" title="Estética anterior">◀</button><span id="skinName"></span><button id="skinNext" class="tb-btn" title="Estética siguiente">▶</button></div>
   <div class="menu-btns">
     <button id="playBtn" class="big-btn">Jugar</button>
     <button id="giftBtn" class="menu-btn">🎁 Regalos</button>
@@ -335,6 +346,7 @@ body.skin-navidad .m-hat{display:block}
     <button id="menuBtn" class="tb-btn">☰ Menú</button>
     <span id="userChip" class="tb-chip"></span>
     <span id="pointsChip" class="tb-chip">⭐ 0</span>
+    <button id="skinBtn" class="tb-btn" title="Cambiar estética">🎨</button>
     <div class="tb-gap"></div>
     <div id="methodBtns" class="tb-group"><span>Método</span></div>
     <div id="digitBtns" class="tb-group"><span>Cifras</span></div>
@@ -346,6 +358,10 @@ body.skin-navidad .m-hat{display:block}
     <h3 id="fpTitle"></h3>
     <div id="fpRows"></div>
     <div class="fp-foot"><span id="fpMsg"></span><button id="fpAll" class="tb-btn">Todas</button><button id="fpNone" class="tb-btn">Ninguna</button><button id="fpOk" class="tb-btn on">Listo</button></div>
+  </div>
+  <div id="skinPop">
+    <h3>Tus estéticas</h3>
+    <div id="skinGrid"></div>
   </div>
   <div class="hud-box" id="gestureLabel">Esperando mano...</div>
   <div id="ptsFloat"></div>
@@ -759,11 +775,11 @@ function isConfirmed(s,now){return!!s&&now-s.start>=TUNE.hold}
 function resetSlots(){slots.thumb=null;slots.index=null;pinchStart=0}
 function fingerCol(pos){return pos.y<sorobanTop||pos.y>sorobanBottom?-1:getColFromScreenX(pos.x)}
 
-// El dedo mas a la izquierda marca la columna; un gesto confirmado la conserva hasta terminar.
+// Manda siempre el dedo mas a la izquierda sobre el tablero, aunque el otro ya tenga un gesto confirmado.
+// Un dedo que esta empujando cuenta por su columna aunque haya salido por arriba o por abajo del tablero.
 function pickLeadCol(pos,now){
-  const held=[slots.thumb,slots.index].find(s=>isConfirmed(s,now));
-  if(held)return held.col;
-  const on=[fingerCol(pos.thumb),fingerCol(pos.index)].filter(c=>c>=0);
+  const colOf=f=>isConfirmed(slots[f],now)?getColFromScreenX(pos[f].x):fingerCol(pos[f]);
+  const on=[colOf('thumb'),colOf('index')].filter(c=>c>=0);
   return on.length?Math.min(...on):-1;
 }
 
@@ -779,7 +795,7 @@ function trackPath(s,pos,bs,now){
 function updateSlot(finger,pos,lead,bs,now){
   const s=slots[finger];
   if(isConfirmed(s,now)){
-    if(getColFromScreenX(pos.x)===s.col)trackPath(s,pos,bs,now);
+    if(s.col===lead&&getColFromScreenX(pos.x)===s.col)trackPath(s,pos,bs,now);
     else slots[finger]=null;
     return;
   }
@@ -1268,7 +1284,7 @@ function leaveGame(){
   gameOn=false;
   stopCamera();
   EX.on=false;clearTimeout(exTimer);
-  closeTutorial();closeFormulaPop(false);
+  closeTutorial();closeFormulaPop(false);toggleSkinPop(false);
   document.getElementById('error').style.display='none';
   document.getElementById('side').classList.remove('on');
   landmarkHistory=[];resetSlots();
@@ -1432,6 +1448,7 @@ function makeExercise(key,digits,allowed,avoid){
     let b=!simple&&digits===1?p.k:randNum(digits);
     let a=digits>1?randNum(digits):!simple&&op==='-'&&p.kind!=='SF'?rand(10,18):rand(0,9);
     if(op==='-'&&a<b){if(!simple&&digits===1)continue;[a,b]=[b,a]}
+    if(b===0)continue;
     const steps=solve(a,b,op),uses=steps.uses;
     const ok=simple?steps.every(s=>s.type==='D'):uses.some(u=>u.key===key)&&uses.every(u=>u.key==='D'||allowed.has(u.key));
     if(!ok)continue;
@@ -1685,6 +1702,7 @@ function renderFormulaPop(){
 
 function openFormulaPop(m){
   if(popMethod===m){closeFormulaPop(true);return}
+  toggleSkinPop(false);
   popMethod=m;
   renderFormulaPop();
   document.getElementById('formulaPop').classList.add('on');
@@ -2429,6 +2447,46 @@ function pullGift(){
   return{skin};
 }
 
+// ---------- Elegir entre las esteticas conseguidas ----------
+function ownedSkins(){return user?SKINS.filter(s=>user.owned.includes(s.id)):[SKINS[0]]}
+
+function cycleSkin(step){
+  const list=ownedSkins();
+  if(list.length<2)return;
+  const i=Math.max(0,list.findIndex(s=>s.id===activeSkinId));
+  equipSkin(list[(i+step+list.length)%list.length].id);
+  renderMenuSkin();
+}
+
+function renderMenuSkin(){
+  const list=ownedSkins();
+  document.getElementById('skinName').textContent=currentSkin().name+' · '+list.length+' de '+SKINS.length;
+  document.getElementById('skinPrev').disabled=document.getElementById('skinNext').disabled=list.length<2;
+  document.getElementById('menuShowcase').innerHTML=miniSoroban(currentSkin(),[5,8,3]);
+  if(currentScreen==='menu')snow.set(!!currentSkin().snow);
+}
+
+function renderSkinPop(){
+  const grid=document.getElementById('skinGrid');
+  grid.textContent='';
+  for(const sk of ownedSkins()){
+    const b=document.createElement('button');
+    b.className='skin-pick'+(sk.id===activeSkinId?' on':'');
+    b.innerHTML=miniSoroban(sk,[2,7]);
+    const name=document.createElement('span');name.textContent=sk.name;
+    b.appendChild(name);
+    b.addEventListener('click',()=>{equipSkin(sk.id);toggleSkinPop(false)});
+    grid.appendChild(b);
+  }
+}
+
+function toggleSkinPop(open){
+  const pop=document.getElementById('skinPop');
+  const on=open===undefined?!pop.classList.contains('on'):open;
+  if(on){closeFormulaPop(true);renderSkinPop();pop.classList.add('on')}
+  else pop.classList.remove('on');
+}
+
 function equipSkin(id){
   if(!user||!user.owned.includes(id))return false;
   user.skin=id;saveStore();
@@ -2495,6 +2553,7 @@ function renderCollection(){
     rar.style.background=sk.rarity==='free'?'#fde68a':RARITY[sk.rarity].color;
     card.appendChild(art);card.appendChild(name);card.appendChild(rar);
     if(owned){
+      card.addEventListener('click',()=>{equipSkin(sk.id);renderCollection()});
       const b=document.createElement('button');
       const inUse=user.skin===sk.id;
       b.textContent=inUse?'En uso':'Usar';b.className=inUse?'inuse':'';
@@ -2564,9 +2623,9 @@ function showMenu(){
   if(!user){showUsers();return}
   document.getElementById('menuUser').textContent=user.avatar+' '+user.name;
   document.getElementById('menuShowcase').innerHTML=miniSoroban(currentSkin(),[5,8,3]);
-  document.getElementById('menuSkin').textContent='Estética: '+currentSkin().name;
   updatePointsUI();
   showScreen('menu');
+  renderMenuSkin();
   preloadHands();
 }
 
@@ -2674,7 +2733,7 @@ function onKey(e){
   if(currentScreen==='intro'&&(key==='enter'||key===' ')){onStart();return}
   if(currentScreen!=='game')return;
   if(TUT.open){if(key==='escape'||key==='enter')closeTutorial();return}
-  if(key==='escape'){if(popMethod)closeFormulaPop(true);else leaveGame()}
+  if(key==='escape'){if(document.getElementById('skinPop').classList.contains('on'))toggleSkinPop(false);else if(popMethod)closeFormulaPop(true);else leaveGame()}
   else if(key==='d')toggleDiag();
   else if(key==='m')mascot.style.display=mascot.style.display==='none'?'':'none';
   else if(key==='r')restartExercise();
@@ -2694,6 +2753,9 @@ on('playBtn','click',enterGame);
 on('giftBtn','click',()=>{renderGacha();showScreen('gacha')});
 on('collBtn','click',()=>{renderCollection();showScreen('collection')});
 on('switchBtn','click',showUsers);
+on('skinPrev','click',()=>cycleSkin(-1));
+on('skinNext','click',()=>cycleSkin(1));
+on('skinBtn','click',()=>toggleSkinPop());
 on('gachaBack','click',showMenu);
 on('collBack','click',showMenu);
 on('pullBtn','click',onPull);
