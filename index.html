@@ -210,6 +210,21 @@ body.skin-navidad .m-hat{display:block}
 #exProgress{font-size:.8rem;color:var(--ui-muted)}
 #exOp{font-size:clamp(1.9rem,4vw,2.9rem);color:var(--ui-accent);line-height:1.15;margin:2px 0 4px;font-variant-numeric:tabular-nums}
 #exercise.done #exOp{color:#d9ffe5}
+#exOp.long{font-size:clamp(1.3rem,2.6vw,1.9rem);overflow-wrap:anywhere}
+#exOp .rt-done{opacity:.4}
+#exOp .rt-cur{text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:6px}
+#retoEnd{display:none;gap:6px;justify-content:center;margin-top:8px;pointer-events:auto}
+#retoEnd.on{display:flex}
+#game.reto #methodBtns,#game.reto #digitBtns{display:none}
+#retoInput{width:min(440px,92vw);padding:11px 14px;border-radius:12px;border:1px solid var(--ui-border);background:rgba(0,0,0,.25);color:var(--ui-text);font:inherit;font-size:1.25rem;line-height:1.5;resize:vertical;font-variant-numeric:tabular-nums}
+.reto-check{display:flex;gap:8px;align-items:center;max-width:min(440px,92vw);font-size:.95rem}
+.reto-check input{width:20px;height:20px;accent-color:var(--ui-accent)}
+#retoMsg{min-height:1.4em;max-width:min(440px,92vw);font-size:.95rem;color:var(--ui-muted);text-align:center}
+#retoMsg.bad{color:#ff8fa3}
+#retoGot{display:none;padding:8px 16px;border-radius:14px;border:1px solid var(--ui-accent);background:var(--ui-panel);color:var(--ui-accent);font-size:1rem}
+#retoGot.on{display:block}
+#retoLink{display:none;width:min(440px,92vw);padding:6px 10px;border-radius:10px;border:1px solid var(--ui-border);background:rgba(0,0,0,.2);color:var(--ui-muted);font:inherit;font-size:.8rem}
+#retoLink.on{display:block}
 #exStars{font-size:1.05rem;letter-spacing:3px;color:var(--ui-accent);font-family:'Segoe UI Symbol','Segoe UI',sans-serif}
 #howBtn{margin-top:6px;padding:4px 12px;border-radius:999px;border:1px solid var(--ui-border);background:var(--ui-panel2);color:var(--ui-text);font-size:.8rem;pointer-events:auto}
 #hintCard{position:relative;height:96px;perspective:700px;cursor:pointer;pointer-events:auto}
@@ -297,6 +312,7 @@ body.skin-navidad .m-hat{display:block}
   <div id="menuSkin"><button id="skinPrev" class="tb-btn" title="Estética anterior">◀</button><span id="skinName"></span><button id="skinNext" class="tb-btn" title="Estética siguiente">▶</button></div>
   <div class="menu-btns">
     <button id="playBtn" class="big-btn">Jugar</button>
+    <button id="retoBtn" class="menu-btn">📝 Reto de la profe</button>
     <button id="giftBtn" class="menu-btn">🎁 Regalos</button>
     <button id="collBtn" class="menu-btn">Colección</button>
     <button id="switchBtn" class="menu-btn">Cambiar usuario</button>
@@ -326,6 +342,20 @@ body.skin-navidad .m-hat{display:block}
   <button id="collBack" class="back-btn">← Menú</button>
   <h2>Colección <span id="collCount"></span></h2>
   <div id="collGrid"></div>
+</div>
+
+<!-- Reto de la profe -->
+<div id="reto" class="screen">
+  <button id="retoBack" class="back-btn">← Menú</button>
+  <h2>📝 Reto de la profe</h2>
+  <p id="retoGot"></p>
+  <p class="note">Escribe una operación por línea, por ejemplo <b>23 + 48</b> o <b>150 − 37 + 12</b>.<br>Para mandarla a la clase, copia el enlace y pégalo en el chat de Zoom: quien lo abra tendrá el reto listo.</p>
+  <textarea id="retoInput" rows="4" spellcheck="false" autocomplete="off" placeholder="23 + 48&#10;150 - 37 + 12"></textarea>
+  <label class="reto-check"><input type="checkbox" id="retoZero"> El estudiante pone también el primer número (empieza en 0)</label>
+  <div id="retoMsg"></div>
+  <button id="retoGo" class="big-btn">▶ Hacer el reto</button>
+  <button id="retoCopy" class="menu-btn">🔗 Copiar enlace para la clase</button>
+  <input id="retoLink" readonly aria-label="Enlace del reto">
 </div>
 
 <div id="error">
@@ -377,6 +407,7 @@ body.skin-navidad .m-hat{display:block}
       <div id="exOp"></div>
       <div id="exStars"></div>
       <button id="howBtn">▶ Cómo se hace</button>
+      <div id="retoEnd"><button id="retoAgain" class="tb-btn">🔁 Otra vez</button><button id="retoNew" class="tb-btn">📝 Otro reto</button></div>
     </div>
     <div id="hintCard" title="Pon el puño sobre la tarjeta, haz clic o pulsa P">
       <div class="flip">
@@ -1301,16 +1332,17 @@ function startTicker(tick){
   }
 }
 
-async function enterGame(){
+// reto=true: hace el reto de la profe (RETO.ops) en lugar de los ciclos de ejercicios.
+async function enterGame(reto){
   if(!user)return;
   showScreen('game');
   gameOn=true;
   sfx.ensure();music.setLevel(MUSIC_LOW);
-  setColumns(SEL.digits+1);
+  setColumns(reto?retoCols():SEL.digits+1);
   resizeCanvas();
   refreshOptionButtons();updatePointsUI();
   document.getElementById('userChip').textContent=user.avatar+' '+user.name;
-  startExercises();
+  if(reto)startReto();else startExercises();
   setGestureLabel('hold','Activando cámara...');
   if(!await startCameraStream())return;
   setGestureLabel('hold','Cargando detector de manos...');
@@ -1322,6 +1354,7 @@ function leaveGame(){
   gameOn=false;
   stopCamera();
   EX.on=false;clearTimeout(exTimer);
+  stopReto();
   closeTutorial();closeFormulaPop(false);toggleSkinPop(false);
   document.getElementById('error').style.display='none';
   document.getElementById('side').classList.remove('on');
@@ -1546,6 +1579,9 @@ function showBigMsg(text){
 }
 
 function renderCard(){
+  if(RETO.on){renderRetoCard();return}
+  document.getElementById('howBtn').style.display='';
+  document.getElementById('exOp').className='';
   const c=EX.cur,done=EX.idx+(EX.done?1:0),n=EX.list.length;
   document.getElementById('exProgress').textContent='Ciclo '+(EX.cycleNo+1)+' · '+Math.min(EX.idx+1,n)+' de '+n;
   document.getElementById('exOp').textContent=c.a+' '+(c.op==='+'?'+':MINUS)+' '+c.b+(EX.done?' = '+c.result:'');
@@ -1603,6 +1639,7 @@ function checkExercise(){
 }
 
 function exerciseDone(){
+  if(RETO.on){retoStepDone();return}
   EX.done=true;
   sfx.win();
   cheerMascot();
@@ -1625,16 +1662,240 @@ function nextExercise(){
 }
 
 function restartExercise(){
+  if(RETO.on){restartReto();return}
   if(!EX.on||!EX.cur||EX.idx>=EX.list.length)return;
   clearTimeout(exTimer);
   loadExercise();
 }
 
 function skipExercise(){
+  if(RETO.on){skipReto();return}
   if(!EX.on||!EX.cur)return;
   clearTimeout(exTimer);
   if(EX.idx>=EX.list.length)startCycle();
   else nextExercise();
+}
+
+// ---------- Reto de la profe ----------
+// La profe escribe una o varias operaciones, tambien encadenadas (150 - 37 + 12), y el estudiante las hace en el
+// soroban con las mismas reglas de los ejercicios: cada suma o resta se valida con allowedStates() y la pista
+// muestra sus formulas. El enlace lleva solo los numeros despues del #, que no se envia a ningun servidor; asi se
+// puede mandar por el chat de Zoom a estudiantes que estan en sus casas.
+const RETO_URL='https://cifras-analisis.github.io/Soroban_App/';
+const RETO_KEY='sorobanAR.reto.v1';
+const RETO_MAX_OPS=20,RETO_MAX_TERMS=10,RETO_MAX_NUM=9999,RETO_MAX_VALUE=99999;
+const RETO={on:false,ops:[],zero:false,i:0,s:1,res:[],finished:false};
+let retoPending=null;
+
+// Una operacion por linea (o separadas por coma). Acepta espacios y los signos + - −.
+// Cada operacion queda como {nums: lo que se ve, terms: lo que se hace}; terms[0] es el valor inicial del soroban.
+function parseReto(text,zero){
+  const lines=String(text||'').replace(/[−–—]/g,'-').split(/[\n,;]+/).map(s=>s.replace(/\s+/g,'')).filter(Boolean);
+  if(!lines.length)return{error:'Escribe al menos una operación.'};
+  if(lines.length>RETO_MAX_OPS)return{error:'Máximo '+RETO_MAX_OPS+' operaciones por reto.'};
+  const ops=[];
+  for(let n=0;n<lines.length;n++){
+    const line=lines[n],tag=(lines.length>1?'Línea '+(n+1)+': ':'');
+    if(!/^\d+([+-]\d+)*$/.test(line))return{error:tag+'usa solo números, + y −.'};
+    const nums=line.split(/(?=[+-])/).map(Number);
+    if(nums.length<2&&!zero)return{error:tag+'falta sumar o restar un número.'};
+    if(nums.length>RETO_MAX_TERMS)return{error:tag+'máximo '+RETO_MAX_TERMS+' números por operación.'};
+    if(nums.some(x=>Math.abs(x)>RETO_MAX_NUM))return{error:tag+'cada número puede tener hasta 4 cifras.'};
+    if(nums.slice(1).some(x=>x===0))return{error:tag+'no hace falta sumar ni restar 0.'};
+    const terms=zero&&nums[0]?[0].concat(nums):nums.slice();
+    if(terms.length<2)return{error:tag+'falta sumar o restar un número.'};
+    let v=terms[0],max=v;
+    for(const x of terms.slice(1)){
+      v+=x;
+      if(v<0)return{error:tag+'el resultado no puede quedar por debajo de 0.'};
+      max=Math.max(max,v);
+    }
+    if(max>RETO_MAX_VALUE)return{error:tag+'el resultado es demasiado grande.'};
+    ops.push({nums,terms,result:v,max});
+  }
+  return{ops,zero:!!zero};
+}
+
+const retoNumText=(x,i)=>i?(x<0?' '+MINUS+' ':' + ')+Math.abs(x):String(x);
+const retoOpText=op=>op.nums.map(retoNumText).join('');
+function retoCols(){return Math.max(2,...RETO.ops.map(o=>String(Math.max(o.max,...o.nums.map(Math.abs))).length))+1}
+
+function retoLink(r){
+  const body=r.ops.map(o=>o.nums.map((x,i)=>i?(x<0?'-':'+')+Math.abs(x):x).join('')).join(',');
+  const local=!/^https?:$/.test(location.protocol||'')||/^(localhost|127\.|\[::1\])/.test(location.hostname||'');
+  return(local?RETO_URL:location.origin+location.pathname)+'#reto='+body+(r.zero?'&cero=1':'');
+}
+
+// Reto que llega en el enlace (#reto=23+48,150-37+12&cero=1); se abre despues de elegir usuario.
+function readRetoHash(){
+  const h=String(location.hash||''),m=/[#&]reto=([^&]*)/.exec(h);
+  if(!m)return null;
+  let txt='';
+  try{txt=decodeURIComponent(m[1])}catch(e){return null}
+  return{text:txt.split(',').map(s=>s.replace(/\+/g,' + ').replace(/-/g,' '+MINUS+' ').trim()).join('\n'),zero:/[#&]cero=1(&|$)/.test(h)};
+}
+
+function retoMsg(text,bad){
+  const el=document.getElementById('retoMsg');
+  el.textContent=text;el.className=bad?'bad':'';
+}
+
+function readRetoForm(){
+  const text=document.getElementById('retoInput').value,zero=document.getElementById('retoZero').checked;
+  const r=parseReto(text,zero);
+  if(r.error){retoMsg(r.error,true);return null}
+  try{localStorage.setItem(RETO_KEY,JSON.stringify({text,zero}))}catch(e){}
+  return r;
+}
+
+function retoPreview(){
+  const r=parseReto(document.getElementById('retoInput').value,document.getElementById('retoZero').checked);
+  if(r.error){retoMsg(document.getElementById('retoInput').value.trim()?r.error:'',true);return}
+  retoMsg('✔ '+r.ops.length+(r.ops.length===1?' operación lista':' operaciones listas'));
+}
+
+function openRetoScreen(pending){
+  const inp=document.getElementById('retoInput'),zero=document.getElementById('retoZero');
+  if(pending){inp.value=pending.text;zero.checked=pending.zero}
+  else if(!inp.value){
+    try{const s=JSON.parse(localStorage.getItem(RETO_KEY));if(s&&typeof s.text==='string'){inp.value=s.text.slice(0,400);zero.checked=!!s.zero}}catch(e){}
+  }
+  const got=document.getElementById('retoGot');
+  got.textContent=pending?'📩 Llegó un reto de la profe. Pulsa ▶ Hacer el reto.':'';
+  got.className=pending?'on':'';
+  document.getElementById('retoLink').className='';
+  retoPreview();
+  showScreen('reto');
+}
+
+function onRetoGo(){
+  const r=readRetoForm();
+  if(!r)return;
+  RETO.ops=r.ops;RETO.zero=r.zero;
+  enterGame(true);
+}
+
+function onRetoCopy(){
+  const r=readRetoForm();
+  if(!r)return;
+  const link=retoLink(r),box=document.getElementById('retoLink');
+  box.value=link;box.className='on';
+  const manual=()=>{try{box.focus();box.select()}catch(e){}retoMsg('Copia el enlace de abajo (Ctrl+C) y pégalo en el chat de Zoom.')};
+  try{navigator.clipboard.writeText(link).then(()=>retoMsg('✔ Enlace copiado. Pégalo en el chat de Zoom.'),manual)}
+  catch(e){manual()}
+}
+
+function startReto(){
+  RETO.on=true;RETO.i=0;RETO.res=[];RETO.finished=false;
+  EX.on=true;EX.seen=new Set();
+  document.getElementById('side').classList.add('on');
+  document.getElementById('game').classList.add('reto');
+  loadRetoOp();
+  showBigMsg('📝 Reto de la profe');
+  mascotTalkAt=0;
+  setMascot('happy','¡Reto de la profe!',MASCOT_LOCK);
+}
+
+function stopReto(){
+  RETO.on=false;
+  document.getElementById('game').classList.remove('reto');
+  document.getElementById('retoEnd').className='';
+}
+
+function loadRetoOp(){
+  const op=RETO.ops[RETO.i];
+  RETO.s=1;EX.hadError=false;
+  setValue(op.terms[0]);
+  loadRetoStep();
+}
+
+// Cada suma o resta del reto es un ejercicio como los de los ciclos, que parte del valor que ya tiene el soroban.
+function loadRetoStep(){
+  const op=RETO.ops[RETO.i],a=op.terms.slice(0,RETO.s).reduce((x,y)=>x+y,0),x=op.terms[RETO.s];
+  const b=Math.abs(x),sign=x<0?'-':'+',uses=solve(a,b,sign).uses,main=uses.find(u=>u.key!=='D');
+  EX.cur={a,b,op:sign,result:a+x,key:main?main.key:'D',uses};
+  EX.key=main?main.key:null;
+  EX.allowed=allowedStates(EX.cur);
+  EX.bad=false;EX.done=false;
+  renderCard();
+  setHint(false);
+}
+
+function retoStepDone(){
+  const op=RETO.ops[RETO.i];
+  if(RETO.s<op.terms.length-1){
+    RETO.s++;
+    loadRetoStep();
+    mascotTalkAt=0;
+    setMascot('happy','¡Bien! Ahora '+retoNumText(op.terms[RETO.s],1).trim(),MASCOT_LOCK);
+    return;
+  }
+  EX.done=true;
+  RETO.res[RETO.i]=EX.hadError?'ok':'clean';
+  sfx.win();
+  cheerMascot();
+  addPoints(PTS_OK+(EX.hadError?0:PTS_CLEAN),EX.hadError?'ok':'clean');
+  renderCard();
+  schedule(nextRetoOp,EX_NEXT_MS);
+}
+
+function nextRetoOp(){
+  RETO.i++;
+  if(RETO.i<RETO.ops.length){loadRetoOp();return}
+  RETO.finished=true;EX.done=true;
+  const ok=RETO.res.filter(Boolean).length,clean=RETO.res.filter(x=>x==='clean').length,n=RETO.ops.length;
+  if(ok)addPoints(PTS_CYCLE,'reto');
+  sfx.fanfare();
+  showBigMsg('¡Reto completado! ✔ '+ok+' de '+n);
+  mascotTalkAt=0;
+  setMascot('happy',clean===n?'¡Todo sin errores!':'¡Reto completado!',BIG_MSG_MS);
+  renderCard();
+}
+
+function restartReto(){
+  if(!RETO.on)return;
+  clearTimeout(exTimer);
+  if(RETO.finished){startReto();return}
+  RETO.res[RETO.i]=undefined;
+  EX.done=false;
+  loadRetoOp();
+}
+
+function skipReto(){
+  if(!RETO.on||RETO.finished)return;
+  clearTimeout(exTimer);
+  if(!RETO.res[RETO.i])RETO.res[RETO.i]='skip';
+  nextRetoOp();
+}
+
+function renderRetoCard(){
+  const n=RETO.ops.length,card=document.getElementById('exercise'),opEl=document.getElementById('exOp');
+  const stars=RETO.ops.map((_,k)=>RETO.res[k]==='ok'||RETO.res[k]==='clean'?'★':'☆').join('');
+  document.getElementById('exStars').textContent=stars;
+  document.getElementById('retoEnd').className=RETO.finished?'on':'';
+  opEl.textContent='';
+  if(RETO.finished){
+    const ok=RETO.res.filter(x=>x==='ok'||x==='clean').length,clean=RETO.res.filter(x=>x==='clean').length;
+    document.getElementById('exProgress').textContent='Reto de la profe · terminado';
+    opEl.className='long';
+    opEl.textContent='✔ '+ok+' de '+n+(clean?' · '+clean+' sin errores':'');
+    document.getElementById('howBtn').style.display='none';
+    card.className='done';
+    return;
+  }
+  const op=RETO.ops[RETO.i],off=op.terms.length-op.nums.length,cur=RETO.s-off;
+  document.getElementById('exProgress').textContent='Reto de la profe · '+(RETO.i+1)+' de '+n+(cur===0?' · pon el primer número':'');
+  op.nums.forEach((x,k)=>{
+    const sp=document.createElement('span');
+    sp.textContent=retoNumText(x,k);
+    if(!EX.done&&k===cur)sp.className='rt-cur';
+    else if(!EX.done&&k<cur&&(k>0||off))sp.className='rt-done';
+    opEl.appendChild(sp);
+  });
+  if(EX.done){const eq=document.createElement('span');eq.textContent=' = '+op.result;opEl.appendChild(eq)}
+  opEl.className=op.nums.length>2||retoOpText(op).length>11?'long':'';
+  document.getElementById('howBtn').style.display=EX.key?'':'none';
+  card.className=EX.done?'done':EX.bad?'error':'';
 }
 
 // ---------- Pista ----------
@@ -1764,7 +2025,7 @@ function applySelection(){
   SEL.keys=ALL_KEYS.filter(k=>SEL.keys.includes(k));
   if(user){user.sel={keys:SEL.keys.slice(),digits:SEL.digits};saveStore()}
   refreshOptionButtons();
-  if(!gameOn)return;
+  if(!gameOn||RETO.on)return;
   clearTimeout(exTimer);
   setColumns(SEL.digits+1);
   startExercises();
@@ -2603,7 +2864,7 @@ function renderCollection(){
 }
 
 // ---------- Pantallas ----------
-const SCREENS=['intro','userScreen','menu','gacha','collection'];
+const SCREENS=['intro','userScreen','menu','gacha','collection','reto'];
 let currentScreen='intro';
 
 function showScreen(name){
@@ -2665,6 +2926,7 @@ function showMenu(){
   showScreen('menu');
   renderMenuSkin();
   preloadHands();
+  if(retoPending){const p=retoPending;retoPending=null;openRetoScreen(p)}
 }
 
 // ---------- Intro ----------
@@ -2785,9 +3047,23 @@ function on(id,ev,fn){document.getElementById(id).addEventListener(ev,fn)}
 window.addEventListener('resize',()=>{resizeCanvas();snow.resize()});
 window.addEventListener('orientationchange',()=>setTimeout(()=>{resizeCanvas();snow.resize()},250));
 document.addEventListener('keydown',onKey);
+// Un enlace de reto abierto con la app ya en marcha: se ofrece en cuanto se esta en el menu.
+window.addEventListener('hashchange',()=>{
+  const p=readRetoHash();
+  if(!p)return;
+  if(user&&!gameOn&&currentScreen!=='intro'&&currentScreen!=='userScreen')openRetoScreen(p);else retoPending=p;
+});
 on('startBtn','click',onStart);
 on('createBtn','click',onCreateUser);
-on('playBtn','click',enterGame);
+on('playBtn','click',()=>enterGame(false));
+on('retoBtn','click',()=>openRetoScreen());
+on('retoBack','click',showMenu);
+on('retoGo','click',onRetoGo);
+on('retoCopy','click',onRetoCopy);
+on('retoInput','input',retoPreview);
+on('retoZero','change',retoPreview);
+on('retoAgain','click',restartReto);
+on('retoNew','click',()=>{leaveGame();openRetoScreen()});
 on('giftBtn','click',()=>{renderGacha();showScreen('gacha')});
 on('collBtn','click',()=>{renderCollection();showScreen('collection')});
 on('switchBtn','click',showUsers);
@@ -2814,6 +3090,7 @@ buildDiag();
 buildOptionButtons();
 refreshPerfUI();
 buildAvatarPick();
+retoPending=readRetoHash();
 buildIntro();
 snow.set(true);
 music.start();
