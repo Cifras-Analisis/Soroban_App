@@ -816,12 +816,18 @@ function isConfirmed(s,now){return!!s&&now-s.start>=TUNE.hold}
 function resetSlots(){slots.thumb=null;slots.index=null;pinchStart=0}
 function fingerCol(pos){return pos.y<sorobanTop||pos.y>sorobanBottom?-1:getColFromScreenX(pos.x)}
 
-// Manda siempre el dedo mas a la izquierda sobre el tablero, aunque el otro ya tenga un gesto confirmado.
-// Un dedo que esta empujando cuenta por su columna aunque haya salido por arriba o por abajo del tablero.
-function pickLeadCol(pos,now){
-  const colOf=f=>isConfirmed(slots[f],now)?getColFromScreenX(pos[f].x):fingerCol(pos[f]);
-  const on=[colOf('thumb'),colOf('index')].filter(c=>c>=0);
-  return on.length?Math.min(...on):-1;
+// Un dedo empuja cuando ya confirmo su gesto y salio de la zona de reposo hacia el lado en que mueve su cuenta.
+function isPushing(s,pos,bs,now){return isConfirmed(s,now)&&(pos[s.finger].y-s.pos.y)*s.dir>TUNE.tolerance*bs.y}
+
+// Columna de trabajo entre los gestos de los dedos (cada uno en la columna de su cuenta).
+// Manda el dedo que empuja; si empujan los dos, el de mas a la izquierda. Un dedo que no esta sobre una
+// cuenta movible no elige columna, asi no bloquea al otro. Con un gesto en cada columna y ninguno
+// empujando todavia devuelve null: cualquiera de los dos puede empezar.
+function pickLeadCol(on,pos,bs,now){
+  const pushing=on.filter(s=>isPushing(s,pos,bs,now));
+  const cs=(pushing.length?pushing:on).map(s=>s.col);
+  if(!pushing.length&&cs.length===2&&cs[0]!==cs[1])return null;
+  return Math.min(...cs);
 }
 
 // El trayecto solo cuenta al salir de la zona de reposo, para que el temblor no parezca zigzag.
@@ -833,14 +839,16 @@ function trackPath(s,pos,bs,now){
 }
 
 // Mientras el dedo se desplaza la espera se reinicia; el gesto queda anclado donde se detuvo.
-function updateSlot(finger,pos,lead,bs,now){
+// Ya confirmado sobrevive si el dedo sale del tablero por arriba o por abajo, pero no si cambia de columna.
+function updateSlot(finger,pos,bs,now){
   const s=slots[finger];
   if(isConfirmed(s,now)){
-    if(s.col===lead&&getColFromScreenX(pos.x)===s.col)trackPath(s,pos,bs,now);
+    if(getColFromScreenX(pos.x)===s.col)trackPath(s,pos,bs,now);
     else slots[finger]=null;
     return;
   }
-  const t=fingerCol(pos)===lead?findPushableBead(finger,pos,lead,bs):null;
+  const col=fingerCol(pos);
+  const t=col>=0?findPushableBead(finger,pos,col,bs):null;
   if(!t){slots[finger]=null;return}
   const still=s&&s.type===t.type&&s.idx===t.idx&&Math.hypot(pos.x-s.pos.x,pos.y-s.pos.y)<=TUNE.tolerance*bs.y;
   if(still)return;
@@ -936,10 +944,12 @@ function showHold(progress){
   holdFill.style.width=(progress*100)+'%';
 }
 
+function hideColIndicator(){if(indicatorKey){indicatorKey='';colIndicator.style.display='none'}}
+
 function showIdle(text){
   setActiveCol(null);setTouchedBeads([]);
   holdBar.style.display='none';
-  if(indicatorKey){indicatorKey='';colIndicator.style.display='none'}
+  hideColIndicator();
   setGestureLabel('idle',text);
 }
 
@@ -961,12 +971,13 @@ function beadsToMove(s){
   return s.dir<0?k.earth.slice(earth,s.idx+1):k.earth.slice(s.idx,earth);
 }
 
+// lead null: hay un gesto en cada columna y ninguno empuja; se resaltan las dos cuentas sin marcar columna.
 function showGesture(active,lead,bs,now){
   const longest=active.reduce((a,b)=>a.start<=b.start?a:b);
   const ready=isConfirmed(longest,now);
   setActiveCol(lead);
   showHold(Math.min(1,(now-longest.start)/TUNE.hold));
-  showColIndicator(lead,ready,bs);
+  if(lead===null)hideColIndicator();else showColIndicator(lead,ready,bs);
   setTouchedBeads(active.flatMap(beadsToMove));
   if(ready)setGestureLabel('hold',active.map(moveText).join(' · '));
   else setGestureLabel('hold',active.map(actionText).join(' · ')+' — mantén');
@@ -1018,24 +1029,30 @@ function processInteraction(){
 
   if(handleSweep(pos.thumb,pos.index,bs,now))return;
 
-  const lead=pickLeadCol(pos,now);
-  if(lead<0){closeAttempt();offTipSince=0;resetSlots();setMascot('awake');showIdle('Esperando...');return}
-  updateSlot('index',pos.index,lead,bs,now);
-  updateSlot('thumb',pos.thumb,lead,bs,now);
-  const active=[slots.thumb,slots.index].filter(Boolean);
-  if(!active.length){
+  // Primero el indice: pushDir() solo deja bajar al pulgar si el indice esta en la cuenta superior de su columna.
+  updateSlot('index',pos.index,bs,now);
+  updateSlot('thumb',pos.thumb,bs,now);
+  const on=[slots.thumb,slots.index].filter(Boolean);
+  if(!on.length){
+    const over=[fingerCol(pos.thumb),fingerCol(pos.index)].filter(c=>c>=0);
+    if(!over.length){closeAttempt();offTipSince=0;resetSlots();setMascot('awake');showIdle('Esperando...');return}
     closeAttempt();
     if(!offTipSince)offTipSince=now;
     if(now-offTipSince>=OFF_TIP_HINT){offTipSince=0;hintMascot('Empuja desde la punta')}
     setMascot('awake');
-    setActiveCol(lead);setTouchedBeads([]);
+    // Con un dedo en cada columna aun no se sabe cual va a empujar: no se marca ninguna.
+    const col=over.length===1||over[0]===over[1]?over[0]:null;
+    setActiveCol(col);setTouchedBeads([]);
     holdBar.style.display='none';
-    showColIndicator(lead,false,bs);
+    if(col===null)hideColIndicator();else showColIndicator(col,false,bs);
     setGestureLabel('idle','Busca la punta de la cuenta');
     return;
   }
 
   offTipSince=0;
+  const lead=pickLeadCol(on,pos,bs,now);
+  if(lead===null){setMascot('focus');showGesture(on,null,bs,now);return}
+  const active=on.filter(s=>s.col===lead);
   const{fire,reason}=decidePush(active,pos,bs,now);
   if(fire.length){applyPush(fire,now);resetSlots();showIdle('Esperando...');return}
   if(reason){diagDecision='Rechazado: '+reason;pendingReason=reason}
@@ -1048,10 +1065,10 @@ function describeFinger(finger,pos,lead,now){
   if(s){
     const m=pushMetrics(s,pos,getBoardScale(),now);
     return(s.type==='heaven'?'cuenta superior':'cuenta inferior '+(s.idx+1))+', col '+(COLS-s.col)+
+      (lead!==null&&s.col!==lead?' (manda el otro dedo)':'')+
       '\n  espera '+Math.min(TUNE.hold,now-s.start)+'/'+TUNE.hold+' ms, avance '+Math.round(m.net)+' px, rectitud '+m.straight.toFixed(2)+', velocidad '+Math.round(m.speed)+' px/s';
   }
-  if(col<0)return'fuera del tablero';
-  return col===lead?'fuera de la punta':'inactivo: columna de la izquierda';
+  return col<0?'fuera del tablero':'fuera de la punta';
 }
 
 function renderDiag(){
@@ -1388,7 +1405,7 @@ function handleFist(lm,now){
   const p=palmPoint(lm),r=hintCard.getBoundingClientRect(),pad=16;
   const over=p.x>=r.left-pad&&p.x<=r.right+pad&&p.y>=r.top-pad&&p.y<=r.bottom+pad;
   resetSlots();setActiveCol(null);setTouchedBeads([]);
-  if(indicatorKey){indicatorKey='';colIndicator.style.display='none'}
+  hideColIndicator();
   if(over){
     hintCard.classList.add('aim');
     if(!fistSince)fistSince=now;
